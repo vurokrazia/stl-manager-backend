@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go run:*)",
+      "Bash(timeout 3 echo:*)",
+      "Bash(exit 0)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(sqlc generate:*)",
+      "Bash(del \"e:\\Impresion3D\\stl-manager-backend\\internal\\handlers\\handlers.go\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
