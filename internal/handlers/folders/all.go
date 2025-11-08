@@ -43,6 +43,7 @@ func (h *Handler) ListFolders(w http.ResponseWriter, r *http.Request) {
 	queries := db.New(h.pool)
 
 	query := r.URL.Query()
+	searchQuery := strings.TrimSpace(query.Get("q"))
 	page := 1
 	pageSize := 20
 	if p := query.Get("page"); p != "" {
@@ -57,20 +58,44 @@ func (h *Handler) ListFolders(w http.ResponseWriter, r *http.Request) {
 	}
 	offset := (page - 1) * pageSize
 
-	folders, err := queries.ListFoldersPaginated(ctx, db.ListFoldersPaginatedParams{
-		Limit:  int32(pageSize),
-		Offset: int32(offset),
-	})
-	if err != nil {
-		h.logger.Error("failed to list folders", zap.Error(err))
-		h.RespondError(w, http.StatusInternalServerError, "Failed to list folders")
-		return
-	}
+	var folders []db.Folder
+	var total int64
+	var err error
 
-	total, err := queries.CountFolders(ctx)
-	if err != nil {
-		h.logger.Error("failed to count folders", zap.Error(err))
-		total = 0
+	// Use search queries if search parameter is provided
+	if searchQuery != "" {
+		folders, err = queries.SearchFoldersPaginated(ctx, db.SearchFoldersPaginatedParams{
+			Search: searchQuery,
+			Limit:  int32(pageSize),
+			Offset: int32(offset),
+		})
+		if err != nil {
+			h.logger.Error("failed to search folders", zap.Error(err))
+			h.RespondError(w, http.StatusInternalServerError, "Failed to search folders")
+			return
+		}
+
+		total, err = queries.CountSearchFolders(ctx, searchQuery)
+		if err != nil {
+			h.logger.Error("failed to count search folders", zap.Error(err))
+			total = 0
+		}
+	} else {
+		folders, err = queries.ListFoldersPaginated(ctx, db.ListFoldersPaginatedParams{
+			Limit:  int32(pageSize),
+			Offset: int32(offset),
+		})
+		if err != nil {
+			h.logger.Error("failed to list folders", zap.Error(err))
+			h.RespondError(w, http.StatusInternalServerError, "Failed to list folders")
+			return
+		}
+
+		total, err = queries.CountFolders(ctx)
+		if err != nil {
+			h.logger.Error("failed to count folders", zap.Error(err))
+			total = 0
+		}
 	}
 
 	type FolderResponse struct {
@@ -399,12 +424,15 @@ func (h *Handler) propagateFolderCategories(
 		ApplyToSubfolders bool     `json:"apply_to_subfolders"`
 	},
 ) {
+	// OPTIMIZED: Use batch operations instead of individual queries
 	files, err := queries.GetFolderFiles(ctx, folderID)
 	if err != nil {
 		h.logger.Error("failed to get folder files for propagation", zap.Error(err))
 		return
 	}
 
+	// Filter files that need category updates
+	var filesToUpdate []pgtype.UUID
 	for _, file := range files {
 		shouldApply := false
 		switch strings.ToLower(file.Type) {
@@ -417,21 +445,40 @@ func (h *Handler) propagateFolderCategories(
 		}
 
 		if shouldApply {
-			if err := queries.RemoveAllFileCategories(ctx, file.ID); err != nil {
-				h.logger.Error("failed to remove file categories during propagation", zap.Error(err))
-				continue
-			}
+			filesToUpdate = append(filesToUpdate, file.ID)
+		}
+	}
 
+	// Batch delete all categories for affected files (1 query instead of N)
+	if len(filesToUpdate) > 0 {
+		if err := queries.BulkRemoveFileCategories(ctx, filesToUpdate); err != nil {
+			h.logger.Error("failed to bulk remove file categories", zap.Error(err))
+			return
+		}
+
+		// Prepare bulk insert data
+		var fileIDs []pgtype.UUID
+		var catIDs []pgtype.UUID
+		for _, fileID := range filesToUpdate {
 			for _, catUUID := range categoryUUIDs {
-				err := queries.AddFileCategory(ctx, db.AddFileCategoryParams{
-					FileID:     file.ID,
-					CategoryID: catUUID,
-				})
-				if err != nil {
-					h.logger.Error("failed to add file category during propagation", zap.Error(err))
-				}
+				fileIDs = append(fileIDs, fileID)
+				catIDs = append(catIDs, catUUID)
 			}
 		}
+
+		// Batch insert all categories (1 query instead of N×M)
+		if len(fileIDs) > 0 {
+			if err := queries.BulkAddFileCategories(ctx, db.BulkAddFileCategoriesParams{
+				FileIds:     fileIDs,
+				CategoryIds: catIDs,
+			}); err != nil {
+				h.logger.Error("failed to bulk add file categories", zap.Error(err))
+			}
+		}
+
+		h.logger.Info("bulk updated file categories",
+			zap.Int("files", len(filesToUpdate)),
+			zap.Int("categories", len(categoryUUIDs)))
 	}
 
 	// TODO: FEATURE FUTURA - Procesamiento recursivo en background
@@ -450,22 +497,44 @@ func (h *Handler) propagateFolderCategories(
 			return
 		}
 
-		// Solo procesa subfolders del nivel actual (sin recursión)
-		for _, subfolder := range subfolders {
-			if err := queries.SetFolderCategories(ctx, subfolder.ID); err != nil {
-				h.logger.Error("failed to clear subfolder categories during propagation", zap.Error(err))
-				continue
+		// OPTIMIZED: Solo procesa subfolders del nivel actual (sin recursión)
+		// Usar batch operations para actualizar múltiples folders a la vez
+		if len(subfolders) > 0 {
+			var subfolderIDs []pgtype.UUID
+			for _, subfolder := range subfolders {
+				subfolderIDs = append(subfolderIDs, subfolder.ID)
 			}
 
-			for _, catUUID := range categoryUUIDs {
-				err := queries.AddFolderCategory(ctx, db.AddFolderCategoryParams{
-					FolderID:   subfolder.ID,
-					CategoryID: catUUID,
-				})
-				if err != nil {
-					h.logger.Error("failed to add subfolder category during propagation", zap.Error(err))
+			// Batch delete all categories for subfolders (1 query instead of N)
+			if err := queries.BulkRemoveFolderCategories(ctx, subfolderIDs); err != nil {
+				h.logger.Error("failed to bulk remove subfolder categories", zap.Error(err))
+				return
+			}
+
+			// Prepare bulk insert data
+			var folderIDs []pgtype.UUID
+			var catIDs []pgtype.UUID
+			for _, subfolderID := range subfolderIDs {
+				for _, catUUID := range categoryUUIDs {
+					folderIDs = append(folderIDs, subfolderID)
+					catIDs = append(catIDs, catUUID)
 				}
 			}
+
+			// Batch insert all categories (1 query instead of N×M)
+			if len(folderIDs) > 0 {
+				if err := queries.BulkAddFolderCategories(ctx, db.BulkAddFolderCategoriesParams{
+					FolderIds:   folderIDs,
+					CategoryIds: catIDs,
+				}); err != nil {
+					h.logger.Error("failed to bulk add subfolder categories", zap.Error(err))
+					return
+				}
+			}
+
+			h.logger.Info("bulk updated subfolder categories",
+				zap.Int("subfolders", len(subfolders)),
+				zap.Int("categories", len(categoryUUIDs)))
 
 			// REMOVED: Recursive call - causes timeout on large folder structures
 			// h.propagateFolderCategories(ctx, queries, subfolder.ID, categoryUUIDs, req)

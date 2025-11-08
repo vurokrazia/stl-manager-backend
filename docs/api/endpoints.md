@@ -635,7 +635,7 @@ curl -X GET "http://localhost:8081/v1/categories?page=1&page_size=20" \
 
 ### GET /v1/browse
 
-**Descripción**: Lista solo los folders raíz (sin parent_folder_id) con paginación. No incluye archivos raíz. Útil para navegación de folders.
+**Descripción**: Lista solo los folders raíz (sin parent_folder_id) con paginación y búsqueda. No incluye archivos raíz. Útil para navegación de folders.
 
 **Autenticación**: Sí (X-API-Key)
 
@@ -649,6 +649,7 @@ curl -X GET "http://localhost:8081/v1/categories?page=1&page_size=20" \
   }
   ```
 - **Query Params**:
+  - `q` (string, optional): Búsqueda por nombre de folder (case-insensitive, usa ILIKE)
   - `page` (number, optional): Número de página (default: 1)
   - `page_size` (number, optional): Elementos por página (default: 20, max: 100)
 
@@ -684,7 +685,12 @@ curl -X GET "http://localhost:8081/v1/categories?page=1&page_size=20" \
 
 **Ejemplo con cURL:**
 ```bash
+# Listar todos los folders raíz
 curl -X GET "http://localhost:8081/v1/browse?page=1&page_size=20" \
+  -H "X-API-Key: dev-secret-key"
+
+# Buscar folders por nombre
+curl -X GET "http://localhost:8081/v1/browse?q=miniatures&page=1" \
   -H "X-API-Key: dev-secret-key"
 ```
 
@@ -766,7 +772,7 @@ curl -X GET "http://localhost:8081/v1/mixed?folder_id=990e8400-e29b-41d4-a716-44
 
 ### GET /v1/folders
 
-**Descripción**: Lista todos los folders con paginación, incluyendo file count y categorías
+**Descripción**: Lista todos los folders con paginación y búsqueda, incluyendo file count y categorías
 
 **Autenticación**: Sí (X-API-Key)
 
@@ -780,6 +786,7 @@ curl -X GET "http://localhost:8081/v1/mixed?folder_id=990e8400-e29b-41d4-a716-44
   }
   ```
 - **Query Params**:
+  - `q` (string, optional): Búsqueda por nombre de folder (case-insensitive, usa ILIKE)
   - `page` (number, optional): Número de página (default: 1)
   - `page_size` (number, optional): Elementos por página (default: 20, max: 100)
 
@@ -817,7 +824,12 @@ curl -X GET "http://localhost:8081/v1/mixed?folder_id=990e8400-e29b-41d4-a716-44
 
 **Ejemplo con cURL:**
 ```bash
+# Listar todos los folders
 curl -X GET "http://localhost:8081/v1/folders?page=1&page_size=20" \
+  -H "X-API-Key: dev-secret-key"
+
+# Buscar folders por nombre
+curl -X GET "http://localhost:8081/v1/folders?q=warhammer&page=1" \
   -H "X-API-Key: dev-secret-key"
 ```
 
@@ -951,7 +963,7 @@ curl -X GET "http://localhost:8081/v1/folders/990e8400-e29b-41d4-a716-4466554400
 
 ### PATCH /v1/folders/{id}/categories
 
-**Descripción**: Actualiza las categorías de un folder con opciones de propagación a archivos y subfolders
+**Descripción**: Actualiza las categorías de un folder con opciones de propagación a archivos y subfolders. Usa batch operations para máxima eficiencia (optimizado para folders con 1000+ archivos).
 
 **Autenticación**: Sí (X-API-Key)
 

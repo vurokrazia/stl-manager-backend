@@ -13,6 +13,10 @@ import (
 type Querier interface {
 	AddFileCategory(ctx context.Context, arg AddFileCategoryParams) error
 	AddFolderCategory(ctx context.Context, arg AddFolderCategoryParams) error
+	BulkAddFileCategories(ctx context.Context, arg BulkAddFileCategoriesParams) error
+	BulkAddFolderCategories(ctx context.Context, arg BulkAddFolderCategoriesParams) error
+	BulkRemoveFileCategories(ctx context.Context, fileIds []pgtype.UUID) error
+	BulkRemoveFolderCategories(ctx context.Context, folderIds []pgtype.UUID) error
 	CountCategories(ctx context.Context) (int64, error)
 	CountFiles(ctx context.Context) (int64, error)
 	CountFilesByType(ctx context.Context, type_ string) (int64, error)
@@ -21,6 +25,8 @@ type Querier interface {
 	CountRootFiles(ctx context.Context) (int64, error)
 	CountRootFolders(ctx context.Context) (int64, error)
 	CountScans(ctx context.Context) (int64, error)
+	CountSearchFolders(ctx context.Context, search string) (int64, error)
+	CountSearchRootFolders(ctx context.Context, search string) (int64, error)
 	CountSubfolders(ctx context.Context, parentFolderID pgtype.UUID) (int64, error)
 	CreateCategory(ctx context.Context, name string) (Category, error)
 	CreateFile(ctx context.Context, arg CreateFileParams) (File, error)
@@ -61,6 +67,8 @@ type Querier interface {
 	RemoveFileCategory(ctx context.Context, arg RemoveFileCategoryParams) error
 	RemoveFolderCategory(ctx context.Context, arg RemoveFolderCategoryParams) error
 	SearchFiles(ctx context.Context, arg SearchFilesParams) ([]SearchFilesRow, error)
+	SearchFoldersPaginated(ctx context.Context, arg SearchFoldersPaginatedParams) ([]Folder, error)
+	SearchRootFoldersPaginated(ctx context.Context, arg SearchRootFoldersPaginatedParams) ([]Folder, error)
 	SetFolderCategories(ctx context.Context, folderID pgtype.UUID) error
 	UpdateFile(ctx context.Context, arg UpdateFileParams) (File, error)
 	UpdateFileFolderID(ctx context.Context, arg UpdateFileFolderIDParams) error

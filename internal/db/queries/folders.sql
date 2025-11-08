@@ -43,6 +43,28 @@ LIMIT $1 OFFSET $2;
 SELECT COUNT(*) FROM folders
 WHERE parent_folder_id IS NULL;
 
+-- name: SearchFoldersPaginated :many
+SELECT * FROM folders
+WHERE name ILIKE '%' || @search::text || '%'
+ORDER BY name
+LIMIT $1 OFFSET $2;
+
+-- name: CountSearchFolders :one
+SELECT COUNT(*) FROM folders
+WHERE name ILIKE '%' || @search::text || '%';
+
+-- name: SearchRootFoldersPaginated :many
+SELECT * FROM folders
+WHERE parent_folder_id IS NULL
+  AND name ILIKE '%' || @search::text || '%'
+ORDER BY name
+LIMIT $1 OFFSET $2;
+
+-- name: CountSearchRootFolders :one
+SELECT COUNT(*) FROM folders
+WHERE parent_folder_id IS NULL
+  AND name ILIKE '%' || @search::text || '%';
+
 -- name: ListSubfolders :many
 SELECT * FROM folders
 WHERE parent_folder_id = $1
@@ -106,6 +128,14 @@ WHERE folder_id = $1 AND category_id = $2;
 
 -- name: SetFolderCategories :exec
 DELETE FROM folders_categories WHERE folder_id = $1;
+
+-- name: BulkRemoveFolderCategories :exec
+DELETE FROM folders_categories WHERE folder_id = ANY(@folder_ids::uuid[]);
+
+-- name: BulkAddFolderCategories :exec
+INSERT INTO folders_categories (folder_id, category_id)
+SELECT UNNEST(@folder_ids::uuid[]), UNNEST(@category_ids::uuid[])
+ON CONFLICT DO NOTHING;
 
 -- name: UpdateFileFolderID :exec
 UPDATE files

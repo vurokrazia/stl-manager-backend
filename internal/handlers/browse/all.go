@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"stl-manager/internal/db"
@@ -41,6 +42,7 @@ func (h *Handler) ListBrowse(w http.ResponseWriter, r *http.Request) {
 	queries := db.New(h.pool)
 
 	query := r.URL.Query()
+	searchQuery := strings.TrimSpace(query.Get("q"))
 	page := 1
 	pageSize := 20
 	if p := query.Get("page"); p != "" {
@@ -55,20 +57,44 @@ func (h *Handler) ListBrowse(w http.ResponseWriter, r *http.Request) {
 	}
 	offset := (page - 1) * pageSize
 
-	folders, err := queries.ListRootFoldersPaginated(ctx, db.ListRootFoldersPaginatedParams{
-		Limit:  int32(pageSize),
-		Offset: int32(offset),
-	})
-	if err != nil {
-		h.logger.Error("failed to list root folders", zap.Error(err))
-		h.RespondError(w, http.StatusInternalServerError, "Failed to list folders")
-		return
-	}
+	var folders []db.Folder
+	var totalFolders int64
+	var err error
 
-	totalFolders, err := queries.CountRootFolders(ctx)
-	if err != nil {
-		h.logger.Error("failed to count folders", zap.Error(err))
-		totalFolders = 0
+	// Use search queries if search parameter is provided
+	if searchQuery != "" {
+		folders, err = queries.SearchRootFoldersPaginated(ctx, db.SearchRootFoldersPaginatedParams{
+			Search: searchQuery,
+			Limit:  int32(pageSize),
+			Offset: int32(offset),
+		})
+		if err != nil {
+			h.logger.Error("failed to search root folders", zap.Error(err))
+			h.RespondError(w, http.StatusInternalServerError, "Failed to search folders")
+			return
+		}
+
+		totalFolders, err = queries.CountSearchRootFolders(ctx, searchQuery)
+		if err != nil {
+			h.logger.Error("failed to count search root folders", zap.Error(err))
+			totalFolders = 0
+		}
+	} else {
+		folders, err = queries.ListRootFoldersPaginated(ctx, db.ListRootFoldersPaginatedParams{
+			Limit:  int32(pageSize),
+			Offset: int32(offset),
+		})
+		if err != nil {
+			h.logger.Error("failed to list root folders", zap.Error(err))
+			h.RespondError(w, http.StatusInternalServerError, "Failed to list folders")
+			return
+		}
+
+		totalFolders, err = queries.CountRootFolders(ctx)
+		if err != nil {
+			h.logger.Error("failed to count folders", zap.Error(err))
+			totalFolders = 0
+		}
 	}
 
 	type BrowseItem struct {

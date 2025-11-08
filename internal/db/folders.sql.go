@@ -27,6 +27,31 @@ func (q *Queries) AddFolderCategory(ctx context.Context, arg AddFolderCategoryPa
 	return err
 }
 
+const bulkAddFolderCategories = `-- name: BulkAddFolderCategories :exec
+INSERT INTO folders_categories (folder_id, category_id)
+SELECT UNNEST($1::uuid[]), UNNEST($2::uuid[])
+ON CONFLICT DO NOTHING
+`
+
+type BulkAddFolderCategoriesParams struct {
+	FolderIds   []pgtype.UUID `json:"folder_ids"`
+	CategoryIds []pgtype.UUID `json:"category_ids"`
+}
+
+func (q *Queries) BulkAddFolderCategories(ctx context.Context, arg BulkAddFolderCategoriesParams) error {
+	_, err := q.db.Exec(ctx, bulkAddFolderCategories, arg.FolderIds, arg.CategoryIds)
+	return err
+}
+
+const bulkRemoveFolderCategories = `-- name: BulkRemoveFolderCategories :exec
+DELETE FROM folders_categories WHERE folder_id = ANY($1::uuid[])
+`
+
+func (q *Queries) BulkRemoveFolderCategories(ctx context.Context, folderIds []pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, bulkRemoveFolderCategories, folderIds)
+	return err
+}
+
 const countFolderFiles = `-- name: CountFolderFiles :one
 SELECT COUNT(*) FROM files
 WHERE folder_id = $1
@@ -57,6 +82,31 @@ WHERE parent_folder_id IS NULL
 
 func (q *Queries) CountRootFolders(ctx context.Context) (int64, error) {
 	row := q.db.QueryRow(ctx, countRootFolders)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countSearchFolders = `-- name: CountSearchFolders :one
+SELECT COUNT(*) FROM folders
+WHERE name ILIKE '%' || $1::text || '%'
+`
+
+func (q *Queries) CountSearchFolders(ctx context.Context, search string) (int64, error) {
+	row := q.db.QueryRow(ctx, countSearchFolders, search)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countSearchRootFolders = `-- name: CountSearchRootFolders :one
+SELECT COUNT(*) FROM folders
+WHERE parent_folder_id IS NULL
+  AND name ILIKE '%' || $1::text || '%'
+`
+
+func (q *Queries) CountSearchRootFolders(ctx context.Context, search string) (int64, error) {
+	row := q.db.QueryRow(ctx, countSearchRootFolders, search)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -509,6 +559,87 @@ type RemoveFolderCategoryParams struct {
 func (q *Queries) RemoveFolderCategory(ctx context.Context, arg RemoveFolderCategoryParams) error {
 	_, err := q.db.Exec(ctx, removeFolderCategory, arg.FolderID, arg.CategoryID)
 	return err
+}
+
+const searchFoldersPaginated = `-- name: SearchFoldersPaginated :many
+SELECT id, name, path, parent_folder_id, created_at, updated_at FROM folders
+WHERE name ILIKE '%' || $3::text || '%'
+ORDER BY name
+LIMIT $1 OFFSET $2
+`
+
+type SearchFoldersPaginatedParams struct {
+	Limit  int32  `json:"limit"`
+	Offset int32  `json:"offset"`
+	Search string `json:"search"`
+}
+
+func (q *Queries) SearchFoldersPaginated(ctx context.Context, arg SearchFoldersPaginatedParams) ([]Folder, error) {
+	rows, err := q.db.Query(ctx, searchFoldersPaginated, arg.Limit, arg.Offset, arg.Search)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Folder{}
+	for rows.Next() {
+		var i Folder
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Path,
+			&i.ParentFolderID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchRootFoldersPaginated = `-- name: SearchRootFoldersPaginated :many
+SELECT id, name, path, parent_folder_id, created_at, updated_at FROM folders
+WHERE parent_folder_id IS NULL
+  AND name ILIKE '%' || $3::text || '%'
+ORDER BY name
+LIMIT $1 OFFSET $2
+`
+
+type SearchRootFoldersPaginatedParams struct {
+	Limit  int32  `json:"limit"`
+	Offset int32  `json:"offset"`
+	Search string `json:"search"`
+}
+
+func (q *Queries) SearchRootFoldersPaginated(ctx context.Context, arg SearchRootFoldersPaginatedParams) ([]Folder, error) {
+	rows, err := q.db.Query(ctx, searchRootFoldersPaginated, arg.Limit, arg.Offset, arg.Search)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Folder{}
+	for rows.Next() {
+		var i Folder
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Path,
+			&i.ParentFolderID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const setFolderCategories = `-- name: SetFolderCategories :exec

@@ -27,6 +27,31 @@ func (q *Queries) AddFileCategory(ctx context.Context, arg AddFileCategoryParams
 	return err
 }
 
+const bulkAddFileCategories = `-- name: BulkAddFileCategories :exec
+INSERT INTO files_categories (file_id, category_id)
+SELECT UNNEST($1::uuid[]), UNNEST($2::uuid[])
+ON CONFLICT DO NOTHING
+`
+
+type BulkAddFileCategoriesParams struct {
+	FileIds     []pgtype.UUID `json:"file_ids"`
+	CategoryIds []pgtype.UUID `json:"category_ids"`
+}
+
+func (q *Queries) BulkAddFileCategories(ctx context.Context, arg BulkAddFileCategoriesParams) error {
+	_, err := q.db.Exec(ctx, bulkAddFileCategories, arg.FileIds, arg.CategoryIds)
+	return err
+}
+
+const bulkRemoveFileCategories = `-- name: BulkRemoveFileCategories :exec
+DELETE FROM files_categories WHERE file_id = ANY($1::uuid[])
+`
+
+func (q *Queries) BulkRemoveFileCategories(ctx context.Context, fileIds []pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, bulkRemoveFileCategories, fileIds)
+	return err
+}
+
 const getFileCategories = `-- name: GetFileCategories :many
 SELECT c.id, c.name, c.created_at FROM categories c
 INNER JOIN files_categories fc ON fc.category_id = c.id

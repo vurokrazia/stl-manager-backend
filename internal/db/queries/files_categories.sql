@@ -16,6 +16,14 @@ WHERE file_id = $1 AND category_id = $2;
 -- name: RemoveAllFileCategories :exec
 DELETE FROM files_categories WHERE file_id = $1;
 
+-- name: BulkRemoveFileCategories :exec
+DELETE FROM files_categories WHERE file_id = ANY(@file_ids::uuid[]);
+
+-- name: BulkAddFileCategories :exec
+INSERT INTO files_categories (file_id, category_id)
+SELECT UNNEST(@file_ids::uuid[]), UNNEST(@category_ids::uuid[])
+ON CONFLICT DO NOTHING;
+
 -- name: GetFilesByCategory :many
 SELECT f.* FROM files f
 INNER JOIN files_categories fc ON fc.file_id = f.id
