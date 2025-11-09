@@ -54,15 +54,20 @@ jobs:
       # Run migrations
       - name: Run database migrations
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stl_manager_test?sslmode=disable
+          PGPASSWORD: postgres
         run: |
-          # Install migrate tool if you use it, or run migrations manually
-          # For now, run migrations from internal/db/migrations if they exist
+          # Apply initial migration first
+          if [ -f "internal/db/migrations/001_init.sql" ]; then
+            echo "Applying initial migration: internal/db/migrations/001_init.sql"
+            psql -h localhost -U postgres -d stl_manager_test -f "internal/db/migrations/001_init.sql"
+          fi
+
+          # Apply additional migrations in order
           if [ -d "migrations" ]; then
-            echo "Running migrations..."
+            echo "Running additional migrations..."
             for migration in migrations/*.sql; do
               echo "Applying $migration..."
-              PGPASSWORD=postgres psql -h localhost -U postgres -d stl_manager_test -f "$migration"
+              psql -h localhost -U postgres -d stl_manager_test -f "$migration"
             done
           fi
 

@@ -14,10 +14,16 @@ run: build ## Build and run the API
 
 migrate-up: ## Run database migrations
 	@echo "Running migrations..."
-	@for migration in migrations/*.sql; do \
-		echo "Applying $$migration..."; \
-		psql $(DATABASE_URL) -f "$$migration"; \
-	done
+	@if [ -f "internal/db/migrations/001_init.sql" ]; then \
+		echo "Applying initial migration: internal/db/migrations/001_init.sql"; \
+		psql $(DATABASE_URL) -f "internal/db/migrations/001_init.sql"; \
+	fi
+	@if [ -d "migrations" ]; then \
+		for migration in migrations/*.sql; do \
+			echo "Applying $$migration..."; \
+			psql $(DATABASE_URL) -f "$$migration"; \
+		done; \
+	fi
 
 migrate-down: ## Rollback database migrations (not implemented)
 	@echo "Migration rollback not implemented yet"
