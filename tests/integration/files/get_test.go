@@ -41,7 +41,7 @@ func TestGetFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := helpers.GET("/files/" + tt.id).WithURLParam("id", tt.id)
+			req := helpers.GET("/files/"+tt.id).WithURLParam("id", tt.id)
 			resp := helpers.MakeRequest(t, req, handler.GetFile)
 			assert.Equal(t, tt.wantCode, resp.Code)
 

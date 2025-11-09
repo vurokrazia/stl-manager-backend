@@ -45,7 +45,7 @@ func TestGetFolder(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := helpers.GET("/folders/" + tt.id).WithURLParam("id", tt.id)
+			req := helpers.GET("/folders/"+tt.id).WithURLParam("id", tt.id)
 			resp := helpers.MakeRequest(t, req, handler.GetFolder)
 			assert.Equal(t, tt.wantCode, resp.Code)
 
@@ -97,7 +97,7 @@ func TestGetFolderWithPagination(t *testing.T) {
 	folderID := uuid.UUID(folder.ID.Bytes).String()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := helpers.GET("/folders/" + folderID).WithURLParam("id", folderID)
+			req := helpers.GET("/folders/"+folderID).WithURLParam("id", folderID)
 			if tt.page != "" {
 				req = req.WithQueryParam("page", tt.page)
 			}
