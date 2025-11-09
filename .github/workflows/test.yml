@@ -56,20 +56,13 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: |
-          # Apply initial migration first
-          if [ -f "internal/db/migrations/001_init.sql" ]; then
-            echo "Applying initial migration: internal/db/migrations/001_init.sql"
-            psql -h localhost -U postgres -d stl_manager_test -f "internal/db/migrations/001_init.sql"
-          fi
-
-          # Apply additional migrations in order
-          if [ -d "migrations" ]; then
-            echo "Running additional migrations..."
-            for migration in migrations/*.sql; do
-              echo "Applying $migration..."
-              psql -h localhost -U postgres -d stl_manager_test -f "$migration"
-            done
-          fi
+          # Apply all migrations in order from migrations/ directory
+          echo "Running migrations from migrations/ directory..."
+          for migration in migrations/*.sql; do
+            [ -f "$migration" ] || continue
+            echo "Applying $migration..."
+            psql -h localhost -U postgres -d stl_manager_test -f "$migration"
+          done
 
       # Lint with golangci-lint
       - name: Run linter

@@ -1,33 +1,34 @@
 # Database Migrations
 
-This directory contains incremental database migrations.
+**All migrations are in this directory (`migrations/`) in sequential order.**
 
 ## Migration Order
 
-Migrations are applied in the following order:
+Migrations are numbered sequentially and applied in order:
 
-1. **`internal/db/migrations/001_init.sql`** (FIRST - creates base tables)
-   - Creates initial tables: `scans`, `files`, `categories`, `files_categories`
-   - Required before all other migrations
+1. **`001_init.sql`** - Creates base tables
+   - Creates: `scans`, `files`, `categories`, `files_categories`
+   - Enables: uuid-ossp, pg_trgm extensions
 
-2. **`migrations/004_create_folders.sql`**
-   - Creates `folders` table
+2. **`002_create_folders.sql`** - Creates folders table
+   - Creates: `folders` table
+   - Indexes: path, name
 
-3. **`migrations/005_create_folders_categories.sql`**
-   - Creates `folders_categories` junction table
+3. **`003_create_folders_categories.sql`** - Folder-category relationship
+   - Creates: `folders_categories` junction table
    - Depends on: folders, categories
 
-4. **`migrations/006_add_folder_to_files.sql`**
-   - Adds `folder_id` column to `files` table
+4. **`004_add_folder_to_files.sql`** - Link files to folders
+   - Adds: `folder_id` column to `files`
    - Depends on: files, folders
 
-5. **`migrations/007_add_parent_folder_id.sql`**
-   - Adds `parent_folder_id` to `folders` table for hierarchy
-   - Depends on: folders
+5. **`005_add_parent_folder_id.sql`** - Folder hierarchy
+   - Adds: `parent_folder_id` to `folders`
+   - Enables: nested folder structure
 
-6. **`migrations/008_add_soft_delete_to_categories.sql`**
-   - Adds `deleted_at` column to `categories` table
-   - Depends on: categories
+6. **`006_add_soft_delete_to_categories.sql`** - Soft delete
+   - Adds: `deleted_at` column to `categories`
+   - Enables: soft delete for categories
 
 ## Running Migrations
 
@@ -38,23 +39,27 @@ make migrate-up
 
 ### Manually with psql
 ```bash
-# 1. Apply initial migration
-psql $DATABASE_URL -f internal/db/migrations/001_init.sql
-
-# 2. Apply incremental migrations
+# Apply all migrations in order
 for migration in migrations/*.sql; do
     psql $DATABASE_URL -f "$migration"
 done
 ```
 
+### Individual migration
+```bash
+psql $DATABASE_URL -f migrations/001_init.sql
+```
+
 ## CI/CD
 
-Migrations are automatically applied in GitHub Actions in the correct order.
+Migrations are automatically applied in GitHub Actions from `migrations/` directory.
 See `.github/workflows/test.yml` for details.
 
 ## Notes
 
-- The initial migration (001_init.sql) is in a separate directory (`internal/db/migrations/`)
-- Incremental migrations (004-008) are numbered to maintain order
+- All migrations are in `migrations/` directory (no other locations)
+- Migrations are numbered sequentially (001, 002, 003...)
+- Applied in alphabetical/numerical order by `*.sql` glob
 - Never modify existing migrations that have been applied to production
 - Always create new migrations for schema changes
+- Old location (`internal/db/migrations/`) is deprecated and should be ignored

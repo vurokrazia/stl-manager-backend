@@ -13,17 +13,12 @@ run: build ## Build and run the API
 	./bin/stl-manager-api
 
 migrate-up: ## Run database migrations
-	@echo "Running migrations..."
-	@if [ -f "internal/db/migrations/001_init.sql" ]; then \
-		echo "Applying initial migration: internal/db/migrations/001_init.sql"; \
-		psql $(DATABASE_URL) -f "internal/db/migrations/001_init.sql"; \
-	fi
-	@if [ -d "migrations" ]; then \
-		for migration in migrations/*.sql; do \
-			echo "Applying $$migration..."; \
-			psql $(DATABASE_URL) -f "$$migration"; \
-		done; \
-	fi
+	@echo "Running migrations from migrations/ directory..."
+	@for migration in migrations/*.sql; do \
+		[ -f "$$migration" ] || continue; \
+		echo "Applying $$migration..."; \
+		psql $(DATABASE_URL) -f "$$migration"; \
+	done
 
 migrate-down: ## Rollback database migrations (not implemented)
 	@echo "Migration rollback not implemented yet"
