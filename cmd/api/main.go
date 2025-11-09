@@ -123,6 +123,11 @@ func main() {
 
 		// Categories
 		r.Get("/categories", categoriesHandler.ListCategories)
+		r.Post("/categories", categoriesHandler.CreateCategory)
+		r.Get("/categories/{id}", categoriesHandler.GetCategory)
+		r.Put("/categories/{id}", categoriesHandler.UpdateCategory)
+		r.Delete("/categories/{id}", categoriesHandler.SoftDeleteCategory)
+		r.Post("/categories/{id}/restore", categoriesHandler.RestoreCategory)
 
 		// Browse - Mixed view of folders and root files
 		r.Get("/browse", browseHandler.ListBrowse)

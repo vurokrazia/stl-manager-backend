@@ -250,6 +250,46 @@ func (q *Queries) GetFolderCategories(ctx context.Context, folderID pgtype.UUID)
 	return items, nil
 }
 
+const getFolderCategoriesBatch = `-- name: GetFolderCategoriesBatch :many
+SELECT fc.folder_id, c.id, c.name, c.created_at
+FROM folders_categories fc
+INNER JOIN categories c ON c.id = fc.category_id
+WHERE fc.folder_id = ANY($1::uuid[])
+ORDER BY fc.folder_id, c.name
+`
+
+type GetFolderCategoriesBatchRow struct {
+	FolderID  pgtype.UUID        `json:"folder_id"`
+	ID        pgtype.UUID        `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) GetFolderCategoriesBatch(ctx context.Context, folderIds []pgtype.UUID) ([]GetFolderCategoriesBatchRow, error) {
+	rows, err := q.db.Query(ctx, getFolderCategoriesBatch, folderIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetFolderCategoriesBatchRow{}
+	for rows.Next() {
+		var i GetFolderCategoriesBatchRow
+		if err := rows.Scan(
+			&i.FolderID,
+			&i.ID,
+			&i.Name,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFolderFiles = `-- name: GetFolderFiles :many
 SELECT f.id, f.path, f.file_name, f.type, f.size, f.modified_at, f.sha256, f.folder_id, f.created_at, f.updated_at FROM files f
 WHERE f.folder_id = $1

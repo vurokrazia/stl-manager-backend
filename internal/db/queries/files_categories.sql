@@ -4,6 +4,13 @@ INNER JOIN files_categories fc ON fc.category_id = c.id
 WHERE fc.file_id = $1
 ORDER BY c.name ASC;
 
+-- name: GetCategoriesBatch :many
+SELECT fc.file_id, c.*
+FROM files_categories fc
+INNER JOIN categories c ON c.id = fc.category_id
+WHERE fc.file_id = ANY(@file_ids::uuid[])
+ORDER BY fc.file_id, c.name;
+
 -- name: AddFileCategory :exec
 INSERT INTO files_categories (file_id, category_id)
 VALUES ($1, $2)

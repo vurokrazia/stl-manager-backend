@@ -106,6 +106,29 @@ func (h *Handler) ListBrowse(w http.ResponseWriter, r *http.Request) {
 		CreatedAt  string        `json:"created_at"`
 	}
 
+	// Collect folder IDs for batch query
+	folderIDs := make([]pgtype.UUID, len(folders))
+	for i, folder := range folders {
+		folderIDs[i] = folder.ID
+	}
+
+	// Get all folder categories in one batch query (1 query instead of N)
+	categoriesMap := make(map[pgtype.UUID][]db.Category)
+	if len(folderIDs) > 0 {
+		batchResults, err := queries.GetFolderCategoriesBatch(ctx, folderIDs)
+		if err != nil {
+			h.logger.Warn("failed to get folder categories batch", zap.Error(err))
+		} else {
+			for _, row := range batchResults {
+				categoriesMap[row.FolderID] = append(categoriesMap[row.FolderID], db.Category{
+					ID:        row.ID,
+					Name:      row.Name,
+					CreatedAt: row.CreatedAt,
+				})
+			}
+		}
+	}
+
 	items := make([]BrowseItem, 0, len(folders))
 
 	for _, folder := range folders {
@@ -117,9 +140,8 @@ func (h *Handler) ListBrowse(w http.ResponseWriter, r *http.Request) {
 		}
 		count := int(fileCount)
 
-		categories, err := queries.GetFolderCategories(ctx, folder.ID)
-		if err != nil {
-			h.logger.Warn("failed to get folder categories", zap.Error(err))
+		categories := categoriesMap[folder.ID]
+		if categories == nil {
 			categories = []db.Category{}
 		}
 
@@ -228,6 +250,48 @@ func (h *Handler) ListMixed(w http.ResponseWriter, r *http.Request) {
 		CreatedAt  string        `json:"created_at"`
 	}
 
+	// Batch query for folder categories (1 query instead of N)
+	folderCategoriesMap := make(map[pgtype.UUID][]db.Category)
+	if len(folders) > 0 {
+		folderIDs := make([]pgtype.UUID, len(folders))
+		for i, folder := range folders {
+			folderIDs[i] = folder.ID
+		}
+		batchResults, err := queries.GetFolderCategoriesBatch(ctx, folderIDs)
+		if err != nil {
+			h.logger.Warn("failed to get folder categories batch", zap.Error(err))
+		} else {
+			for _, row := range batchResults {
+				folderCategoriesMap[row.FolderID] = append(folderCategoriesMap[row.FolderID], db.Category{
+					ID:        row.ID,
+					Name:      row.Name,
+					CreatedAt: row.CreatedAt,
+				})
+			}
+		}
+	}
+
+	// Batch query for file categories (1 query instead of M)
+	fileCategoriesMap := make(map[pgtype.UUID][]db.Category)
+	if len(files) > 0 {
+		fileIDs := make([]pgtype.UUID, len(files))
+		for i, file := range files {
+			fileIDs[i] = file.ID
+		}
+		batchResults, err := queries.GetCategoriesBatch(ctx, fileIDs)
+		if err != nil {
+			h.logger.Warn("failed to get file categories batch", zap.Error(err))
+		} else {
+			for _, row := range batchResults {
+				fileCategoriesMap[row.FileID] = append(fileCategoriesMap[row.FileID], db.Category{
+					ID:        row.ID,
+					Name:      row.Name,
+					CreatedAt: row.CreatedAt,
+				})
+			}
+		}
+	}
+
 	items := make([]MixedItem, 0, len(folders)+len(files))
 
 	for _, folder := range folders {
@@ -239,9 +303,8 @@ func (h *Handler) ListMixed(w http.ResponseWriter, r *http.Request) {
 		}
 		count := int(fileCount)
 
-		categories, err := queries.GetFolderCategories(ctx, folder.ID)
-		if err != nil {
-			h.logger.Warn("failed to get folder categories", zap.Error(err))
+		categories := folderCategoriesMap[folder.ID]
+		if categories == nil {
 			categories = []db.Category{}
 		}
 
@@ -256,9 +319,8 @@ func (h *Handler) ListMixed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, file := range files {
-		categories, err := queries.GetFileCategories(ctx, file.ID)
-		if err != nil {
-			h.logger.Warn("failed to get file categories", zap.Error(err))
+		categories := fileCategoriesMap[file.ID]
+		if categories == nil {
 			categories = []db.Category{}
 		}
 

@@ -104,6 +104,29 @@ func (h *Handler) ListFolders(w http.ResponseWriter, r *http.Request) {
 		Categories []db.Category `json:"categories"`
 	}
 
+	// Collect folder IDs for batch queries
+	folderIDs := make([]pgtype.UUID, len(folders))
+	for i, folder := range folders {
+		folderIDs[i] = folder.ID
+	}
+
+	// Get all folder categories in one batch query (1 query instead of N)
+	categoriesMap := make(map[pgtype.UUID][]db.Category)
+	if len(folderIDs) > 0 {
+		batchResults, err := queries.GetFolderCategoriesBatch(ctx, folderIDs)
+		if err != nil {
+			h.logger.Warn("failed to get folder categories batch", zap.Error(err))
+		} else {
+			for _, row := range batchResults {
+				categoriesMap[row.FolderID] = append(categoriesMap[row.FolderID], db.Category{
+					ID:        row.ID,
+					Name:      row.Name,
+					CreatedAt: row.CreatedAt,
+				})
+			}
+		}
+	}
+
 	response := make([]FolderResponse, len(folders))
 	for i, folder := range folders {
 		// FIX: Use CountFolderFiles instead of loading all files
@@ -113,9 +136,8 @@ func (h *Handler) ListFolders(w http.ResponseWriter, r *http.Request) {
 			fileCount = 0
 		}
 
-		categories, err := queries.GetFolderCategories(ctx, folder.ID)
-		if err != nil {
-			h.logger.Warn("failed to get folder categories", zap.Error(err))
+		categories := categoriesMap[folder.ID]
+		if categories == nil {
 			categories = []db.Category{}
 		}
 
@@ -291,6 +313,27 @@ func (h *Handler) GetFolder(w http.ResponseWriter, r *http.Request) {
 		Categories []db.Category `json:"categories"`
 	}
 
+	// Batch query for subfolder categories (1 query instead of N)
+	subfolderCategoriesMap := make(map[pgtype.UUID][]db.Category)
+	if len(subfolders) > 0 {
+		subfolderIDs := make([]pgtype.UUID, len(subfolders))
+		for i, subfolder := range subfolders {
+			subfolderIDs[i] = subfolder.ID
+		}
+		batchResults, err := queries.GetFolderCategoriesBatch(ctx, subfolderIDs)
+		if err != nil {
+			h.logger.Warn("failed to get subfolder categories batch", zap.Error(err))
+		} else {
+			for _, row := range batchResults {
+				subfolderCategoriesMap[row.FolderID] = append(subfolderCategoriesMap[row.FolderID], db.Category{
+					ID:        row.ID,
+					Name:      row.Name,
+					CreatedAt: row.CreatedAt,
+				})
+			}
+		}
+	}
+
 	subfoldersWithInfo := make([]SubfolderWithInfo, len(subfolders))
 	for i, subfolder := range subfolders {
 		// FIX: Use CountFolderFiles instead of loading all files
@@ -300,9 +343,8 @@ func (h *Handler) GetFolder(w http.ResponseWriter, r *http.Request) {
 			fileCount = 0
 		}
 
-		subfolderCategories, err := queries.GetFolderCategories(ctx, subfolder.ID)
-		if err != nil {
-			h.logger.Warn("failed to get subfolder categories", zap.Error(err))
+		subfolderCategories := subfolderCategoriesMap[subfolder.ID]
+		if subfolderCategories == nil {
 			subfolderCategories = []db.Category{}
 		}
 
@@ -318,11 +360,31 @@ func (h *Handler) GetFolder(w http.ResponseWriter, r *http.Request) {
 		Categories []db.Category `json:"categories"`
 	}
 
+	// Batch query for file categories (1 query instead of M)
+	fileCategoriesMap := make(map[pgtype.UUID][]db.Category)
+	if len(files) > 0 {
+		fileIDs := make([]pgtype.UUID, len(files))
+		for i, file := range files {
+			fileIDs[i] = file.ID
+		}
+		batchResults, err := queries.GetCategoriesBatch(ctx, fileIDs)
+		if err != nil {
+			h.logger.Warn("failed to get file categories batch", zap.Error(err))
+		} else {
+			for _, row := range batchResults {
+				fileCategoriesMap[row.FileID] = append(fileCategoriesMap[row.FileID], db.Category{
+					ID:        row.ID,
+					Name:      row.Name,
+					CreatedAt: row.CreatedAt,
+				})
+			}
+		}
+	}
+
 	filesWithCategories := make([]FileWithCategories, len(files))
 	for i, file := range files {
-		fileCategories, err := queries.GetFileCategories(ctx, file.ID)
-		if err != nil {
-			h.logger.Warn("failed to get file categories", zap.Error(err))
+		fileCategories := fileCategoriesMap[file.ID]
+		if fileCategories == nil {
 			fileCategories = []db.Category{}
 		}
 		filesWithCategories[i] = FileWithCategories{

@@ -37,6 +37,7 @@ func (h *Handler) ListCategories(w http.ResponseWriter, r *http.Request) {
 	queries := db.New(h.pool)
 
 	query := r.URL.Query()
+	searchQuery := query.Get("q")
 	page := 1
 	pageSize := 20
 	if p := query.Get("page"); p != "" {
@@ -51,20 +52,44 @@ func (h *Handler) ListCategories(w http.ResponseWriter, r *http.Request) {
 	}
 	offset := (page - 1) * pageSize
 
-	categories, err := queries.ListCategoriesPaginated(ctx, db.ListCategoriesPaginatedParams{
-		Limit:  int32(pageSize),
-		Offset: int32(offset),
-	})
-	if err != nil {
-		h.logger.Error("failed to list categories", zap.Error(err))
-		h.RespondError(w, http.StatusInternalServerError, "failed to list categories")
-		return
-	}
+	var categories []db.Category
+	var total int64
+	var err error
 
-	total, err := queries.CountCategories(ctx)
-	if err != nil {
-		h.logger.Error("failed to count categories", zap.Error(err))
-		total = 0
+	// Use search if query parameter provided
+	if searchQuery != "" {
+		categories, err = queries.SearchCategoriesPaginated(ctx, db.SearchCategoriesPaginatedParams{
+			Search: searchQuery,
+			Limit:  int32(pageSize),
+			Offset: int32(offset),
+		})
+		if err != nil {
+			h.logger.Error("failed to search categories", zap.Error(err))
+			h.RespondError(w, http.StatusInternalServerError, "failed to search categories")
+			return
+		}
+
+		total, err = queries.CountSearchCategories(ctx, searchQuery)
+		if err != nil {
+			h.logger.Error("failed to count search categories", zap.Error(err))
+			total = 0
+		}
+	} else {
+		categories, err = queries.ListCategoriesPaginated(ctx, db.ListCategoriesPaginatedParams{
+			Limit:  int32(pageSize),
+			Offset: int32(offset),
+		})
+		if err != nil {
+			h.logger.Error("failed to list categories", zap.Error(err))
+			h.RespondError(w, http.StatusInternalServerError, "failed to list categories")
+			return
+		}
+
+		total, err = queries.CountCategories(ctx)
+		if err != nil {
+			h.logger.Error("failed to count categories", zap.Error(err))
+			total = 0
+		}
 	}
 
 	h.RespondJSON(w, http.StatusOK, map[string]any{

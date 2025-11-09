@@ -25,6 +25,7 @@ type Querier interface {
 	CountRootFiles(ctx context.Context) (int64, error)
 	CountRootFolders(ctx context.Context) (int64, error)
 	CountScans(ctx context.Context) (int64, error)
+	CountSearchCategories(ctx context.Context, search string) (int64, error)
 	CountSearchFolders(ctx context.Context, search string) (int64, error)
 	CountSearchRootFolders(ctx context.Context, search string) (int64, error)
 	CountSubfolders(ctx context.Context, parentFolderID pgtype.UUID) (int64, error)
@@ -37,6 +38,7 @@ type Querier interface {
 	DeleteFile(ctx context.Context, id pgtype.UUID) error
 	DeleteFolder(ctx context.Context, id pgtype.UUID) error
 	DeleteScan(ctx context.Context, id pgtype.UUID) error
+	GetCategoriesBatch(ctx context.Context, fileIds []pgtype.UUID) ([]GetCategoriesBatchRow, error)
 	GetCategory(ctx context.Context, id pgtype.UUID) (Category, error)
 	GetCategoryByName(ctx context.Context, name string) (Category, error)
 	GetFile(ctx context.Context, id pgtype.UUID) (File, error)
@@ -46,6 +48,7 @@ type Querier interface {
 	GetFolder(ctx context.Context, id pgtype.UUID) (Folder, error)
 	GetFolderByPath(ctx context.Context, path string) (Folder, error)
 	GetFolderCategories(ctx context.Context, folderID pgtype.UUID) ([]Category, error)
+	GetFolderCategoriesBatch(ctx context.Context, folderIds []pgtype.UUID) ([]GetFolderCategoriesBatchRow, error)
 	GetFolderFiles(ctx context.Context, folderID pgtype.UUID) ([]File, error)
 	GetFolderFilesPaginated(ctx context.Context, arg GetFolderFilesPaginatedParams) ([]File, error)
 	GetScan(ctx context.Context, id pgtype.UUID) (Scan, error)
@@ -66,10 +69,14 @@ type Querier interface {
 	RemoveAllFileCategories(ctx context.Context, fileID pgtype.UUID) error
 	RemoveFileCategory(ctx context.Context, arg RemoveFileCategoryParams) error
 	RemoveFolderCategory(ctx context.Context, arg RemoveFolderCategoryParams) error
+	RestoreCategory(ctx context.Context, id pgtype.UUID) error
+	SearchCategoriesPaginated(ctx context.Context, arg SearchCategoriesPaginatedParams) ([]Category, error)
 	SearchFiles(ctx context.Context, arg SearchFilesParams) ([]SearchFilesRow, error)
 	SearchFoldersPaginated(ctx context.Context, arg SearchFoldersPaginatedParams) ([]Folder, error)
 	SearchRootFoldersPaginated(ctx context.Context, arg SearchRootFoldersPaginatedParams) ([]Folder, error)
 	SetFolderCategories(ctx context.Context, folderID pgtype.UUID) error
+	SoftDeleteCategory(ctx context.Context, id pgtype.UUID) error
+	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error)
 	UpdateFile(ctx context.Context, arg UpdateFileParams) (File, error)
 	UpdateFileFolderID(ctx context.Context, arg UpdateFileFolderIDParams) error
 	UpdateFolder(ctx context.Context, arg UpdateFolderParams) (Folder, error)

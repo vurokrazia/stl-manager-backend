@@ -6,6 +6,7 @@ import (
 
 	"stl-manager/internal/db"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 )
 
@@ -101,17 +102,41 @@ func (h *Handler) ListFiles(w http.ResponseWriter, r *http.Request) {
 		total, _ = queries.CountFiles(ctx)
 	}
 
-	// Attach categories to each file
+	// Attach categories to each file using batch query (1 query instead of N)
 	type FileWithCategories struct {
 		db.File
 		Categories []db.Category `json:"categories"`
 	}
 
+	// Collect file IDs
+	fileIDs := make([]pgtype.UUID, len(files))
+	for i, file := range files {
+		fileIDs[i] = file.ID
+	}
+
+	// Get all categories in one query
+	categoriesMap := make(map[pgtype.UUID][]db.Category)
+	if len(fileIDs) > 0 {
+		batchResults, err := queries.GetCategoriesBatch(ctx, fileIDs)
+		if err != nil {
+			h.logger.Warn("failed to get file categories batch", zap.Error(err))
+		} else {
+			// Group categories by file_id
+			for _, row := range batchResults {
+				categoriesMap[row.FileID] = append(categoriesMap[row.FileID], db.Category{
+					ID:        row.ID,
+					Name:      row.Name,
+					CreatedAt: row.CreatedAt,
+				})
+			}
+		}
+	}
+
+	// Build response with categories
 	filesWithCategories := make([]FileWithCategories, len(files))
 	for i, file := range files {
-		categories, err := queries.GetFileCategories(ctx, file.ID)
-		if err != nil {
-			h.logger.Warn("failed to get file categories", zap.Error(err))
+		categories := categoriesMap[file.ID]
+		if categories == nil {
 			categories = []db.Category{}
 		}
 		filesWithCategories[i] = FileWithCategories{

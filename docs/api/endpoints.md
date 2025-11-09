@@ -27,6 +27,11 @@
 
 ### Categories
 - [GET /v1/categories](#get-v1categories) - Listar categorías
+- [POST /v1/categories](#post-v1categories) - Crear categoría
+- [GET /v1/categories/{id}](#get-v1categoriesid) - Obtener categoría por ID
+- [PUT /v1/categories/{id}](#put-v1categoriesid) - Actualizar categoría
+- [DELETE /v1/categories/{id}](#delete-v1categoriesid) - Eliminar categoría (soft delete)
+- [POST /v1/categories/{id}/restore](#post-v1categoriesidrestore) - Restaurar categoría eliminada
 
 ### Browse & Navigation
 - [GET /v1/browse](#get-v1browse) - Navegar folders raíz
@@ -580,7 +585,7 @@ curl -X PATCH http://localhost:8081/v1/files/660e8400-e29b-41d4-a716-44665544000
 
 ### GET /v1/categories
 
-**Descripción**: Lista todas las categorías disponibles con paginación
+**Descripción**: Lista todas las categorías disponibles con paginación y búsqueda. Solo retorna categorías activas (no eliminadas).
 
 **Autenticación**: Sí (X-API-Key)
 
@@ -594,6 +599,7 @@ curl -X PATCH http://localhost:8081/v1/files/660e8400-e29b-41d4-a716-44665544000
   }
   ```
 - **Query Params**:
+  - `q` (string, optional): Búsqueda por nombre de categoría (case-insensitive, usa ILIKE)
   - `page` (number, optional): Número de página (default: 1)
   - `page_size` (number, optional): Elementos por página (default: 20, max: 100)
 
@@ -604,12 +610,14 @@ curl -X PATCH http://localhost:8081/v1/files/660e8400-e29b-41d4-a716-44665544000
     {
       "id": "770e8400-e29b-41d4-a716-446655440002",
       "name": "miniatures",
-      "created_at": "2024-11-01T00:00:00Z"
+      "created_at": "2024-11-01T00:00:00Z",
+      "deleted_at": null
     },
     {
       "id": "880e8400-e29b-41d4-a716-446655440003",
       "name": "fantasy",
-      "created_at": "2024-11-01T00:00:00Z"
+      "created_at": "2024-11-01T00:00:00Z",
+      "deleted_at": null
     }
   ],
   "total": 15,
@@ -625,7 +633,320 @@ curl -X PATCH http://localhost:8081/v1/files/660e8400-e29b-41d4-a716-44665544000
 
 **Ejemplo con cURL:**
 ```bash
+# Listar todas las categorías
 curl -X GET "http://localhost:8081/v1/categories?page=1&page_size=20" \
+  -H "X-API-Key: dev-secret-key"
+
+# Buscar categorías
+curl -X GET "http://localhost:8081/v1/categories?q=lego" \
+  -H "X-API-Key: dev-secret-key"
+```
+
+---
+
+### POST /v1/categories
+
+**Descripción**: Crea una nueva categoría
+
+**Autenticación**: Sí (X-API-Key)
+
+**Request:**
+- **Method**: POST
+- **URL**: `/v1/categories`
+- **Headers**:
+  ```json
+  {
+    "Content-Type": "application/json",
+    "X-API-Key": "dev-secret-key"
+  }
+  ```
+- **Body**:
+  ```json
+  {
+    "name": "lego"
+  }
+  ```
+
+**Validaciones:**
+- `name`: string requerido, único (case-insensitive)
+
+**Response Success (201 Created):**
+```json
+{
+  "id": "990e8400-e29b-41d4-a716-446655440008",
+  "name": "lego",
+  "created_at": "2024-11-02T15:30:00Z",
+  "deleted_at": null
+}
+```
+
+**Response Error (400 Bad Request):**
+```json
+{
+  "error": "name is required"
+}
+```
+
+**Response Error (500 Internal Server Error):**
+```json
+{
+  "error": "failed to create category"
+}
+```
+
+**Códigos de estado:**
+- `201`: Categoría creada exitosamente
+- `400`: Request inválido
+- `500`: Error al crear categoría (ej: nombre duplicado)
+
+**Ejemplo con cURL:**
+```bash
+curl -X POST http://localhost:8081/v1/categories \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-secret-key" \
+  -d '{"name": "lego"}'
+```
+
+---
+
+### GET /v1/categories/{id}
+
+**Descripción**: Obtiene una categoría específica por su ID. Solo retorna categorías activas (no eliminadas).
+
+**Autenticación**: Sí (X-API-Key)
+
+**Request:**
+- **Method**: GET
+- **URL**: `/v1/categories/{id}`
+- **Headers**:
+  ```json
+  {
+    "X-API-Key": "dev-secret-key"
+  }
+  ```
+- **URL Params**:
+  - `id` (string, required): UUID de la categoría
+
+**Response Success (200 OK):**
+```json
+{
+  "id": "770e8400-e29b-41d4-a716-446655440002",
+  "name": "miniatures",
+  "created_at": "2024-11-01T00:00:00Z",
+  "deleted_at": null
+}
+```
+
+**Response Error (400 Bad Request):**
+```json
+{
+  "error": "Invalid category ID"
+}
+```
+
+**Response Error (404 Not Found):**
+```json
+{
+  "error": "category not found"
+}
+```
+
+**Códigos de estado:**
+- `200`: Categoría encontrada
+- `400`: ID inválido
+- `404`: Categoría no encontrada o eliminada
+- `500`: Error al obtener categoría
+
+**Ejemplo con cURL:**
+```bash
+curl -X GET http://localhost:8081/v1/categories/770e8400-e29b-41d4-a716-446655440002 \
+  -H "X-API-Key: dev-secret-key"
+```
+
+---
+
+### PUT /v1/categories/{id}
+
+**Descripción**: Actualiza el nombre de una categoría existente
+
+**Autenticación**: Sí (X-API-Key)
+
+**Request:**
+- **Method**: PUT
+- **URL**: `/v1/categories/{id}`
+- **Headers**:
+  ```json
+  {
+    "Content-Type": "application/json",
+    "X-API-Key": "dev-secret-key"
+  }
+  ```
+- **URL Params**:
+  - `id` (string, required): UUID de la categoría
+- **Body**:
+  ```json
+  {
+    "name": "lego-sets"
+  }
+  ```
+
+**Validaciones:**
+- `name`: string requerido, único (case-insensitive)
+
+**Response Success (200 OK):**
+```json
+{
+  "id": "990e8400-e29b-41d4-a716-446655440008",
+  "name": "lego-sets",
+  "created_at": "2024-11-02T15:30:00Z",
+  "deleted_at": null
+}
+```
+
+**Response Error (400 Bad Request):**
+```json
+{
+  "error": "name is required"
+}
+```
+
+**Response Error (404 Not Found):**
+```json
+{
+  "error": "category not found"
+}
+```
+
+**Códigos de estado:**
+- `200`: Categoría actualizada exitosamente
+- `400`: Request inválido o ID inválido
+- `404`: Categoría no encontrada
+- `500`: Error al actualizar categoría
+
+**Notas:**
+- Solo se puede actualizar el nombre de categorías activas (no eliminadas)
+- Los cambios se reflejan automáticamente en todos los archivos y folders que usan esta categoría
+
+**Ejemplo con cURL:**
+```bash
+curl -X PUT http://localhost:8081/v1/categories/990e8400-e29b-41d4-a716-446655440008 \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-secret-key" \
+  -d '{"name": "lego-sets"}'
+```
+
+---
+
+### DELETE /v1/categories/{id}
+
+**Descripción**: Elimina una categoría mediante soft delete (marca como eliminada sin borrar de la base de datos). Las relaciones con archivos y folders se mantienen intactas.
+
+**Autenticación**: Sí (X-API-Key)
+
+**Request:**
+- **Method**: DELETE
+- **URL**: `/v1/categories/{id}`
+- **Headers**:
+  ```json
+  {
+    "X-API-Key": "dev-secret-key"
+  }
+  ```
+- **URL Params**:
+  - `id` (string, required): UUID de la categoría
+
+**Response Success (200 OK):**
+```json
+{
+  "message": "category deleted successfully"
+}
+```
+
+**Response Error (400 Bad Request):**
+```json
+{
+  "error": "Invalid category ID"
+}
+```
+
+**Response Error (500 Internal Server Error):**
+```json
+{
+  "error": "failed to delete category"
+}
+```
+
+**Códigos de estado:**
+- `200`: Categoría eliminada exitosamente
+- `400`: ID inválido
+- `500`: Error al eliminar categoría
+
+**Notas:**
+- Soft delete: La categoría no se elimina físicamente, solo se marca como eliminada (deleted_at)
+- Las categorías eliminadas no aparecen en listados ni búsquedas
+- Las relaciones con archivos/folders se mantienen
+- Una categoría eliminada puede restaurarse con POST /v1/categories/{id}/restore
+
+**Ejemplo con cURL:**
+```bash
+curl -X DELETE http://localhost:8081/v1/categories/990e8400-e29b-41d4-a716-446655440008 \
+  -H "X-API-Key: dev-secret-key"
+```
+
+---
+
+### POST /v1/categories/{id}/restore
+
+**Descripción**: Restaura una categoría previamente eliminada (soft delete), haciéndola visible nuevamente
+
+**Autenticación**: Sí (X-API-Key)
+
+**Request:**
+- **Method**: POST
+- **URL**: `/v1/categories/{id}/restore`
+- **Headers**:
+  ```json
+  {
+    "X-API-Key": "dev-secret-key"
+  }
+  ```
+- **URL Params**:
+  - `id` (string, required): UUID de la categoría
+
+**Response Success (200 OK):**
+```json
+{
+  "message": "category restored successfully"
+}
+```
+
+**Response Error (400 Bad Request):**
+```json
+{
+  "error": "Invalid category ID"
+}
+```
+
+**Response Error (500 Internal Server Error):**
+```json
+{
+  "error": "failed to restore category"
+}
+```
+
+**Códigos de estado:**
+- `200`: Categoría restaurada exitosamente
+- `400`: ID inválido
+- `500`: Error al restaurar categoría
+
+**Notas:**
+- Solo se pueden restaurar categorías que fueron previamente eliminadas con soft delete
+- Después de restaurar, la categoría vuelve a aparecer en listados y búsquedas
+- Las relaciones con archivos/folders se mantuvieron intactas durante la eliminación
+
+**Ejemplo con cURL:**
+```bash
+curl -X POST http://localhost:8081/v1/categories/990e8400-e29b-41d4-a716-446655440008/restore \
   -H "X-API-Key: dev-secret-key"
 ```
 

@@ -117,6 +117,13 @@ INNER JOIN folders_categories fc ON c.id = fc.category_id
 WHERE fc.folder_id = $1
 ORDER BY c.name;
 
+-- name: GetFolderCategoriesBatch :many
+SELECT fc.folder_id, c.*
+FROM folders_categories fc
+INNER JOIN categories c ON c.id = fc.category_id
+WHERE fc.folder_id = ANY(@folder_ids::uuid[])
+ORDER BY fc.folder_id, c.name;
+
 -- name: AddFolderCategory :exec
 INSERT INTO folders_categories (folder_id, category_id)
 VALUES ($1, $2)

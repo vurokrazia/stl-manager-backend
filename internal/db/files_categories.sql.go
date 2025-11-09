@@ -52,6 +52,46 @@ func (q *Queries) BulkRemoveFileCategories(ctx context.Context, fileIds []pgtype
 	return err
 }
 
+const getCategoriesBatch = `-- name: GetCategoriesBatch :many
+SELECT fc.file_id, c.id, c.name, c.created_at
+FROM files_categories fc
+INNER JOIN categories c ON c.id = fc.category_id
+WHERE fc.file_id = ANY($1::uuid[])
+ORDER BY fc.file_id, c.name
+`
+
+type GetCategoriesBatchRow struct {
+	FileID    pgtype.UUID        `json:"file_id"`
+	ID        pgtype.UUID        `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) GetCategoriesBatch(ctx context.Context, fileIds []pgtype.UUID) ([]GetCategoriesBatchRow, error) {
+	rows, err := q.db.Query(ctx, getCategoriesBatch, fileIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCategoriesBatchRow{}
+	for rows.Next() {
+		var i GetCategoriesBatchRow
+		if err := rows.Scan(
+			&i.FileID,
+			&i.ID,
+			&i.Name,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFileCategories = `-- name: GetFileCategories :many
 SELECT c.id, c.name, c.created_at FROM categories c
 INNER JOIN files_categories fc ON fc.category_id = c.id

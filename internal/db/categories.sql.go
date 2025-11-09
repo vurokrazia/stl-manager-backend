@@ -13,10 +13,24 @@ import (
 
 const countCategories = `-- name: CountCategories :one
 SELECT COUNT(*) FROM categories
+WHERE deleted_at IS NULL
 `
 
 func (q *Queries) CountCategories(ctx context.Context) (int64, error) {
 	row := q.db.QueryRow(ctx, countCategories)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countSearchCategories = `-- name: CountSearchCategories :one
+SELECT COUNT(*) FROM categories
+WHERE deleted_at IS NULL
+  AND name ILIKE '%' || $1::text || '%'
+`
+
+func (q *Queries) CountSearchCategories(ctx context.Context, search string) (int64, error) {
+	row := q.db.QueryRow(ctx, countSearchCategories, search)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -45,7 +59,9 @@ func (q *Queries) DeleteCategory(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getCategory = `-- name: GetCategory :one
-SELECT id, name, created_at FROM categories WHERE id = $1 LIMIT 1
+SELECT id, name, created_at FROM categories
+WHERE id = $1 AND deleted_at IS NULL
+LIMIT 1
 `
 
 func (q *Queries) GetCategory(ctx context.Context, id pgtype.UUID) (Category, error) {
@@ -56,7 +72,9 @@ func (q *Queries) GetCategory(ctx context.Context, id pgtype.UUID) (Category, er
 }
 
 const getCategoryByName = `-- name: GetCategoryByName :one
-SELECT id, name, created_at FROM categories WHERE name = $1 LIMIT 1
+SELECT id, name, created_at FROM categories
+WHERE name = $1 AND deleted_at IS NULL
+LIMIT 1
 `
 
 func (q *Queries) GetCategoryByName(ctx context.Context, name string) (Category, error) {
@@ -67,7 +85,9 @@ func (q *Queries) GetCategoryByName(ctx context.Context, name string) (Category,
 }
 
 const listCategories = `-- name: ListCategories :many
-SELECT id, name, created_at FROM categories ORDER BY name ASC
+SELECT id, name, created_at FROM categories
+WHERE deleted_at IS NULL
+ORDER BY name ASC
 `
 
 func (q *Queries) ListCategories(ctx context.Context) ([]Category, error) {
@@ -91,7 +111,10 @@ func (q *Queries) ListCategories(ctx context.Context) ([]Category, error) {
 }
 
 const listCategoriesPaginated = `-- name: ListCategoriesPaginated :many
-SELECT id, name, created_at FROM categories ORDER BY name ASC LIMIT $1 OFFSET $2
+SELECT id, name, created_at FROM categories
+WHERE deleted_at IS NULL
+ORDER BY name ASC
+LIMIT $1 OFFSET $2
 `
 
 type ListCategoriesPaginatedParams struct {
@@ -117,4 +140,79 @@ func (q *Queries) ListCategoriesPaginated(ctx context.Context, arg ListCategorie
 		return nil, err
 	}
 	return items, nil
+}
+
+const restoreCategory = `-- name: RestoreCategory :exec
+UPDATE categories
+SET deleted_at = NULL
+WHERE id = $1
+`
+
+func (q *Queries) RestoreCategory(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, restoreCategory, id)
+	return err
+}
+
+const searchCategoriesPaginated = `-- name: SearchCategoriesPaginated :many
+SELECT id, name, created_at FROM categories
+WHERE deleted_at IS NULL
+  AND name ILIKE '%' || $3::text || '%'
+ORDER BY name ASC
+LIMIT $1 OFFSET $2
+`
+
+type SearchCategoriesPaginatedParams struct {
+	Limit  int32  `json:"limit"`
+	Offset int32  `json:"offset"`
+	Search string `json:"search"`
+}
+
+func (q *Queries) SearchCategoriesPaginated(ctx context.Context, arg SearchCategoriesPaginatedParams) ([]Category, error) {
+	rows, err := q.db.Query(ctx, searchCategoriesPaginated, arg.Limit, arg.Offset, arg.Search)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Category{}
+	for rows.Next() {
+		var i Category
+		if err := rows.Scan(&i.ID, &i.Name, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const softDeleteCategory = `-- name: SoftDeleteCategory :exec
+UPDATE categories
+SET deleted_at = NOW()
+WHERE id = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) SoftDeleteCategory(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, softDeleteCategory, id)
+	return err
+}
+
+const updateCategory = `-- name: UpdateCategory :one
+UPDATE categories
+SET name = $2
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id, name, created_at
+`
+
+type UpdateCategoryParams struct {
+	ID   pgtype.UUID `json:"id"`
+	Name string      `json:"name"`
+}
+
+func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error) {
+	row := q.db.QueryRow(ctx, updateCategory, arg.ID, arg.Name)
+	var i Category
+	err := row.Scan(&i.ID, &i.Name, &i.CreatedAt)
+	return i, err
 }

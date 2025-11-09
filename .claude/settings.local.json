@@ -8,7 +8,21 @@
       "Bash(findstr:*)",
       "Bash(taskkill:*)",
       "Bash(sqlc generate:*)",
-      "Bash(del \"e:\\Impresion3D\\stl-manager-backend\\internal\\handlers\\handlers.go\")"
+      "Bash(del \"e:\\Impresion3D\\stl-manager-backend\\internal\\handlers\\handlers.go\")",
+      "Bash(go build:*)",
+      "Bash(gh repo list:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh repo archive:*)",
+      "Bash(psql:*)",
+      "Bash(del insert_category.go)",
+      "Bash(del run_migration.go)",
+      "Bash(go get:*)",
+      "Bash(go test:*)",
+      "Bash(go mod tidy:*)",
+      "Bash(go tool cover:*)"
     ],
     "deny": [],
     "ask": []
