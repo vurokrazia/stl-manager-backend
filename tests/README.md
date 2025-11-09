@@ -295,14 +295,28 @@ go test ./tests/integration/... -count=1
 
 ---
 
-## 📈 Roadmap
+## 📈 Tests Completados
 
-- [x] Categories API - 17 tests
-- [ ] Files API - Pendiente
-- [ ] Folders API - Pendiente
-- [ ] Browse API - Pendiente
-- [ ] Scans API - Pendiente
-- [ ] Health API - Pendiente
+- [x] **Categories API** - 17 tests ✅
+- [x] **Files API** - 15 tests ✅
+- [x] **Folders API** - 17 tests ✅
+- [x] **Browse API** - 5 tests ✅
+- [x] **Scans API** - 10 tests ✅
+- [x] **Health API** - 2 tests ✅
+
+**TOTAL: 66 tests - TODOS PASANDO** ✅
+
+### Tiempo de Ejecución
+```
+browse:      6.564s
+categories:  5.292s
+files:       7.676s
+folders:    13.745s
+health:      2.515s
+scans:       3.336s
+─────────────────────
+TOTAL:     ~39 seconds
+```
 
 ---
 

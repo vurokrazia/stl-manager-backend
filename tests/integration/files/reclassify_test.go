@@ -35,7 +35,7 @@ func TestReclassifyFile(t *testing.T) {
 		{
 			name:     "file not found",
 			fileID:   uuid.New().String(),
-			wantCode: http.StatusServiceUnavailable, // Will check OpenAI first, then file
+			wantCode: http.StatusNotFound, // File check happens before OpenAI check
 		},
 	}
 

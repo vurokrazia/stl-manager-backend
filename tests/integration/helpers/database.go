@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"stl-manager/internal/db"
 
@@ -125,10 +126,11 @@ func CreateTestFile(t *testing.T, fileName, fileType string, folderID pgtype.UUI
 
 	// Create file
 	file, err := queries.CreateFile(ctx, db.CreateFileParams{
-		Path:     uniquePath,
-		FileName: fileName + "." + fileType,
-		Type:     fileType,
-		Size:     1024,
+		Path:       uniquePath,
+		FileName:   fileName + "." + fileType,
+		Type:       fileType,
+		Size:       1024,
+		ModifiedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	})
 	require.NoError(t, err, "Failed to create test file")
 

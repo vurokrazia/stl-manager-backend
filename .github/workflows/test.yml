@@ -2,9 +2,9 @@ name: Tests & Quality Checks
 
 on:
   push:
-    branches: [ main, develop, claude/** ]
+    branches: [ main, master, develop, claude/**, test/** ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, master, develop ]
 
 jobs:
   test:
@@ -83,7 +83,7 @@ jobs:
           mkdir -p /tmp/test-scan
           go test ./tests/integration/... -v -race -coverprofile=coverage.txt -covermode=atomic
 
-      # Upload coverage to Codecov (optional)
+      # Upload coverage to Codecov (optional, won't fail CI)
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
         with:
@@ -91,6 +91,7 @@ jobs:
           flags: integration
           fail_ci_if_error: false
         continue-on-error: true
+        if: always()
 
       # Build the application
       - name: Build application
@@ -114,7 +115,6 @@ jobs:
           else
             echo "No unit tests found (only integration tests)"
           fi
-        continue-on-error: true
 
   # Security scan (optional but recommended)
   security:
