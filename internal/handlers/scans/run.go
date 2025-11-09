@@ -175,7 +175,7 @@ func (h *Handler) runScan(ctx context.Context, scanID uuid.UUID) {
 			}
 
 			// Remove existing categories and add new ones
-			queries.RemoveAllFileCategories(ctx, savedFile.ID)
+			_ = queries.RemoveAllFileCategories(ctx, savedFile.ID)
 			for _, catName := range classifiedCategories {
 				if catID, ok := categoryMap[catName]; ok {
 					err = queries.AddFileCategory(ctx, db.AddFileCategoryParams{

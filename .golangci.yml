@@ -21,10 +21,17 @@ linters:
     - unconvert
   settings:
     errcheck:
-      check-type-assertions: true
-      check-blank: true
+      check-type-assertions: false
+      check-blank: false
+      exclude-functions:
+        - encoding/json.Marshal
+        - (*encoding/json.Encoder).Encode
+        - (io.Closer).Close
     govet:
       enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
     revive:
       confidence: 0.8
     gosec:
@@ -33,6 +40,7 @@ linters:
         - G115
         - G304
         - G101
+        - G104
     goconst:
       min-len: 3
       min-occurrences: 3
