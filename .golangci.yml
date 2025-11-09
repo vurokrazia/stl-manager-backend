@@ -5,6 +5,8 @@ run:
   timeout: 5m
   tests: true
   modules-download-mode: readonly
+  skip-dirs:
+    - scripts
 
 linters:
   enable:
@@ -22,11 +24,6 @@ linters:
     - gosec         # Security issues
     - goconst       # Find repeated strings
     - unconvert     # Remove unnecessary type conversions
-
-  disable:
-    - structcheck   # Deprecated
-    - deadcode      # Deprecated
-    - varcheck      # Deprecated
 
 linters-settings:
   errcheck:
