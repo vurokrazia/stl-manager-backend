@@ -60,8 +60,8 @@ func (s *Scanner) Scan(ctx context.Context) ([]FileInfo, error) {
 			// Skip hidden directories and specific folders
 			dirName := filepath.Base(path)
 			if strings.HasPrefix(dirName, ".") ||
-			   strings.HasPrefix(dirName, "$") ||
-			   dirName == "stl-manager-backend" {
+				strings.HasPrefix(dirName, "$") ||
+				dirName == "stl-manager-backend" {
 				return filepath.SkipDir
 			}
 			return nil
@@ -139,7 +139,7 @@ func (s *Scanner) ComputeSHA256(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {

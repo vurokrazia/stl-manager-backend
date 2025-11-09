@@ -1,0 +1,160 @@
+name: Tests & Quality Checks
+
+on:
+  push:
+    branches: [ main, develop, claude/** ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+
+    # PostgreSQL service for integration tests
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: stl_manager_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      # Setup PostgreSQL extensions needed for the app
+      - name: Setup PostgreSQL extensions
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d stl_manager_test -c "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"
+          psql -h localhost -U postgres -d stl_manager_test -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+
+      # Run migrations
+      - name: Run database migrations
+        env:
+          PGPASSWORD: postgres
+        run: |
+          # Apply all migrations in order from migrations/ directory
+          echo "Running migrations from migrations/ directory..."
+          for migration in migrations/*.sql; do
+            [ -f "$migration" ] || continue
+            echo "Applying $migration..."
+            psql -h localhost -U postgres -d stl_manager_test -f "$migration"
+          done
+
+      # Lint with golangci-lint
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          args: --timeout=5m ./cmd/... ./internal/... ./tests/...
+
+      # Run tests with coverage
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stl_manager_test?sslmode=disable
+          SCAN_ROOT_DIR: /tmp/test-scan
+          SUPPORTED_EXTS: .stl,.zip,.rar
+          API_KEY: test-api-key
+          OPENAI_API_KEY: ""
+        run: |
+          mkdir -p /tmp/test-scan
+          go test ./tests/integration/... -v -race -coverprofile=coverage.txt -covermode=atomic
+
+      # Upload coverage to Codecov (optional)
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.txt
+          flags: integration
+          fail_ci_if_error: false
+        continue-on-error: true
+
+      # Build the application
+      - name: Build application
+        run: |
+          go build -v -o bin/api ./cmd/api
+
+      # Verify the binary was created
+      - name: Verify build
+        run: |
+          if [ ! -f "bin/api" ]; then
+            echo "Build failed: binary not found"
+            exit 1
+          fi
+          echo "Build successful: $(ls -lh bin/api)"
+
+      # Optional: Run unit tests (if they exist)
+      - name: Run unit tests
+        run: |
+          if go list ./... | grep -v /tests/ | grep -q .; then
+            go test $(go list ./... | grep -v /tests/) -short -v
+          else
+            echo "No unit tests found (only integration tests)"
+          fi
+        continue-on-error: true
+
+  # Security scan (optional but recommended)
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: '-no-fail -fmt sarif -out results.sarif ./...'
+        continue-on-error: true
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+        continue-on-error: true
+
+  # Check code formatting
+  format-check:
+    name: Code Formatting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Check formatting
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "The following files are not formatted:"
+            gofmt -l .
+            echo "Please run: gofmt -w ."
+            exit 1
+          fi
+          echo "All files are properly formatted"

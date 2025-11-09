@@ -1,0 +1,56 @@
+# golangci-lint v2 configuration
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  default: standard
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - revive
+    - gosec
+    - goconst
+    - unconvert
+  settings:
+    errcheck:
+      check-type-assertions: false
+      check-blank: false
+      exclude-functions:
+        - encoding/json.Marshal
+        - (*encoding/json.Encoder).Encode
+        - (io.Closer).Close
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
+    revive:
+      confidence: 0.8
+    gosec:
+      excludes:
+        - G404
+        - G115
+        - G304
+        - G101
+        - G104
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  show-stats: true
+  sort-order:
+    - linter
+    - file

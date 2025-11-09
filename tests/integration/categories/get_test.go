@@ -38,7 +38,7 @@ func TestGetCategory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := helpers.GET("/categories/" + tt.id).WithURLParam("id", tt.id)
+			req := helpers.GET("/categories/"+tt.id).WithURLParam("id", tt.id)
 			resp := helpers.MakeRequest(t, req, handler.GetCategory)
 			assert.Equal(t, tt.wantCode, resp.Code)
 		})
