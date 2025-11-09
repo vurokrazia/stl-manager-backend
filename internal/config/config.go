@@ -10,18 +10,18 @@ import (
 )
 
 type Config struct {
-	DatabaseURL      string
-	SupabaseURL      string
-	SupabaseAnonKey  string
-	OpenAIAPIKey     string
-	RedisAddr        string
-	RedisUsername    string
-	RedisPassword    string
-	RedisDB          int
-	ScanRootDir      string
-	SupportedExts    []string
-	APIKey           string
-	Port             string
+	DatabaseURL     string
+	SupabaseURL     string
+	SupabaseAnonKey string
+	OpenAIAPIKey    string
+	RedisAddr       string
+	RedisUsername   string
+	RedisPassword   string
+	RedisDB         int
+	ScanRootDir     string
+	SupportedExts   []string
+	APIKey          string
+	Port            string
 }
 
 func Load() (*Config, error) {

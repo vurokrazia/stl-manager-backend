@@ -60,8 +60,8 @@ func (s *Scanner) Scan(ctx context.Context) ([]FileInfo, error) {
 			// Skip hidden directories and specific folders
 			dirName := filepath.Base(path)
 			if strings.HasPrefix(dirName, ".") ||
-			   strings.HasPrefix(dirName, "$") ||
-			   dirName == "stl-manager-backend" {
+				strings.HasPrefix(dirName, "$") ||
+				dirName == "stl-manager-backend" {
 				return filepath.SkipDir
 			}
 			return nil
