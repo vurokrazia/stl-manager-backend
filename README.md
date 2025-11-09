@@ -1,5 +1,9 @@
 # STL Manager - Backend API
 
+[![Tests & Quality Checks](https://github.com/vurokrazia/stl-manager-backend/actions/workflows/test.yml/badge.svg)](https://github.com/vurokrazia/stl-manager-backend/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/vurokrazia/stl-manager-backend)](https://goreportcard.com/report/github.com/vurokrazia/stl-manager-backend)
+[![codecov](https://codecov.io/gh/vurokrazia/stl-manager-backend/branch/main/graph/badge.svg)](https://codecov.io/gh/vurokrazia/stl-manager-backend)
+
 Backend en Go para gestionar y clasificar archivos STL de impresión 3D usando PostgreSQL (Supabase) y OpenAI.
 
 ## Features
@@ -185,6 +189,35 @@ make build
 # Ver todos los comandos
 make help
 ```
+
+### Tests
+
+El proyecto incluye tests de integración completos para todos los endpoints.
+
+```bash
+# Ejecutar todos los tests
+go test ./tests/integration/... -v
+
+# Ejecutar tests de un módulo específico
+go test ./tests/integration/categories/... -v
+
+# Ejecutar con cobertura
+go test ./tests/integration/... -coverprofile=coverage.out
+go tool cover -html=coverage.out
+
+# Tests en paralelo
+go test ./tests/integration/... -v -parallel 4
+```
+
+**Cobertura actual:**
+- ✅ Categories API - 17 tests
+- ✅ Health API - 2 tests
+- ✅ Browse API - 3 tests
+- ✅ Folders API - 4 tests
+- ✅ Files API - 2 tests
+- ✅ Scans API - 2 tests
+
+Ver más en [tests/README.md](tests/README.md)
 
 ## Estructura del proyecto
 
