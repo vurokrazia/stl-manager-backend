@@ -65,9 +65,11 @@ jobs:
           done
 
       # Lint with golangci-lint
-      - name: Run linter
-        run: |
-          golangci-lint run --timeout=5m ./cmd/... ./internal/... ./tests/...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2
+          args: --timeout=5m ./cmd/... ./internal/... ./tests/...
 
       # Run tests with coverage
       - name: Run tests
