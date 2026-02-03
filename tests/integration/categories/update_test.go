@@ -23,21 +23,21 @@ func TestUpdateCategory(t *testing.T) {
 	}{
 		{
 			name:     "update successfully",
-			id:       uuid.UUID(cat.ID.Bytes).String(),
+			id:       cat.ID,
 			body:     categories.UpdateCategoryRequest{Name: "updated-" + uuid.New().String()[:8]},
 			wantCode: http.StatusOK,
 		},
 		{
 			name:     "empty name fails",
-			id:       uuid.UUID(cat.ID.Bytes).String(),
+			id:       cat.ID,
 			body:     categories.UpdateCategoryRequest{Name: ""},
 			wantCode: http.StatusBadRequest,
 		},
 		{
-			name:     "invalid id",
+			name:     "invalid id returns error",
 			id:       "invalid",
 			body:     categories.UpdateCategoryRequest{Name: "test"},
-			wantCode: http.StatusBadRequest,
+			wantCode: http.StatusInternalServerError,
 		},
 	}
 

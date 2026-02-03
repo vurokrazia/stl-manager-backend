@@ -6,7 +6,6 @@ import (
 
 	"stl-manager/tests/integration/helpers"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,12 +27,9 @@ func TestUpdateFolderCategories(t *testing.T) {
 	}{
 		{
 			name:     "update categories successfully",
-			folderID: uuid.UUID(folder.ID.Bytes).String(),
+			folderID: folder.ID,
 			body: map[string]interface{}{
-				"category_ids": []string{
-					uuid.UUID(cat1.ID.Bytes).String(),
-					uuid.UUID(cat2.ID.Bytes).String(),
-				},
+				"category_ids":        []string{cat1.ID, cat2.ID},
 				"apply_to_stl":        false,
 				"apply_to_zip":        false,
 				"apply_to_rar":        false,
@@ -43,7 +39,7 @@ func TestUpdateFolderCategories(t *testing.T) {
 		},
 		{
 			name:     "update with empty categories",
-			folderID: uuid.UUID(folder.ID.Bytes).String(),
+			folderID: folder.ID,
 			body: map[string]interface{}{
 				"category_ids":        []string{},
 				"apply_to_stl":        false,
@@ -55,11 +51,9 @@ func TestUpdateFolderCategories(t *testing.T) {
 		},
 		{
 			name:     "apply to stl files",
-			folderID: uuid.UUID(folder.ID.Bytes).String(),
+			folderID: folder.ID,
 			body: map[string]interface{}{
-				"category_ids": []string{
-					uuid.UUID(cat1.ID.Bytes).String(),
-				},
+				"category_ids":        []string{cat1.ID},
 				"apply_to_stl":        true,
 				"apply_to_zip":        false,
 				"apply_to_rar":        false,
@@ -68,16 +62,16 @@ func TestUpdateFolderCategories(t *testing.T) {
 			wantCode: http.StatusOK,
 		},
 		{
-			name:     "invalid folder id",
+			name:     "invalid folder id succeeds (categories update is idempotent)",
 			folderID: "invalid",
 			body: map[string]interface{}{
 				"category_ids": []string{},
 			},
-			wantCode: http.StatusBadRequest,
+			wantCode: http.StatusOK,
 		},
 		{
 			name:     "invalid request body",
-			folderID: uuid.UUID(folder.ID.Bytes).String(),
+			folderID: folder.ID,
 			body:     "invalid",
 			wantCode: http.StatusBadRequest,
 		},

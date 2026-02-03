@@ -20,12 +20,13 @@ func TestMain(m *testing.M) {
 
 	cfg := &config.Config{
 		ScanRootDir:   "E:\\Impresion3D",
+		ScanRootDirs:  []string{"E:\\Impresion3D"},
 		SupportedExts: []string{".stl", ".zip", ".rar"},
 		OpenAIAPIKey:  "",
 	}
 	classifier := ai.NewOpenAIClassifier("")
-	fileScanner := scanner.New(cfg.ScanRootDir, cfg.SupportedExts, helpers.TestLogger)
-	handler = scans.New(helpers.TestPool, classifier, fileScanner, cfg, helpers.TestLogger)
+	fileScanner := scanner.New(cfg.ScanRootDirs, cfg.SupportedExts, helpers.TestLogger)
+	handler = scans.New(helpers.TestDB, classifier, fileScanner, cfg, helpers.TestLogger)
 
 	code := m.Run()
 	helpers.CleanupTestDatabase()

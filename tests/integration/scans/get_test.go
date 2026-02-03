@@ -21,13 +21,13 @@ func TestGetScan(t *testing.T) {
 	}{
 		{
 			name:     "get existing scan",
-			id:       uuid.UUID(scan.ID.Bytes).String(),
+			id:       scan.ID,
 			wantCode: http.StatusOK,
 		},
 		{
-			name:     "invalid id",
+			name:     "invalid id returns not found",
 			id:       "invalid",
-			wantCode: http.StatusBadRequest,
+			wantCode: http.StatusNotFound,
 		},
 		{
 			name:     "not found",

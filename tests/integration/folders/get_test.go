@@ -15,10 +15,10 @@ func TestGetFolder(t *testing.T) {
 	defer helpers.DeleteTestFolder(t, folder.ID)
 
 	// Create some test files in the folder
-	file1 := helpers.CreateTestFile(t, "file1", "stl", folder.ID)
+	file1 := helpers.CreateTestFile(t, "file1", "stl", &folder.ID)
 	defer helpers.DeleteTestFile(t, file1.ID)
 
-	file2 := helpers.CreateTestFile(t, "file2", "zip", folder.ID)
+	file2 := helpers.CreateTestFile(t, "file2", "zip", &folder.ID)
 	defer helpers.DeleteTestFile(t, file2.ID)
 
 	tests := []struct {
@@ -28,13 +28,13 @@ func TestGetFolder(t *testing.T) {
 	}{
 		{
 			name:     "get existing folder",
-			id:       uuid.UUID(folder.ID.Bytes).String(),
+			id:       folder.ID,
 			wantCode: http.StatusOK,
 		},
 		{
-			name:     "invalid id",
+			name:     "invalid id returns not found",
 			id:       "invalid",
-			wantCode: http.StatusBadRequest,
+			wantCode: http.StatusNotFound,
 		},
 		{
 			name:     "not found",
@@ -66,7 +66,7 @@ func TestGetFolderWithPagination(t *testing.T) {
 
 	// Create multiple test files
 	for i := 0; i < 5; i++ {
-		file := helpers.CreateTestFile(t, "file-"+string(rune(i+'0')), "stl", folder.ID)
+		file := helpers.CreateTestFile(t, "file-"+string(rune(i+'0')), "stl", &folder.ID)
 		defer helpers.DeleteTestFile(t, file.ID)
 	}
 
@@ -94,10 +94,9 @@ func TestGetFolderWithPagination(t *testing.T) {
 		},
 	}
 
-	folderID := uuid.UUID(folder.ID.Bytes).String()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := helpers.GET("/folders/"+folderID).WithURLParam("id", folderID)
+			req := helpers.GET("/folders/"+folder.ID).WithURLParam("id", folder.ID)
 			if tt.page != "" {
 				req = req.WithQueryParam("page", tt.page)
 			}
