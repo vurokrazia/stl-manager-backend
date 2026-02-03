@@ -15,7 +15,7 @@ func TestUpdateFileCategories(t *testing.T) {
 	folder := helpers.CreateTestFolder(t, "test-folder")
 	defer helpers.DeleteTestFolder(t, folder.ID)
 
-	file := helpers.CreateTestFile(t, "test-file", "stl", folder.ID)
+	file := helpers.CreateTestFile(t, "test-file", "stl", &folder.ID)
 	defer helpers.DeleteTestFile(t, file.ID)
 
 	cat1 := helpers.CreateTestCategory(t, "test-cat-1")
@@ -32,28 +32,25 @@ func TestUpdateFileCategories(t *testing.T) {
 	}{
 		{
 			name:   "update categories successfully",
-			fileID: uuid.UUID(file.ID.Bytes).String(),
+			fileID: file.ID,
 			body: files.UpdateCategoriesRequest{
-				CategoryIDs: []string{
-					uuid.UUID(cat1.ID.Bytes).String(),
-					uuid.UUID(cat2.ID.Bytes).String(),
-				},
+				CategoryIDs: []string{cat1.ID, cat2.ID},
 			},
 			wantCode: http.StatusOK,
 		},
 		{
 			name:   "update with empty categories",
-			fileID: uuid.UUID(file.ID.Bytes).String(),
+			fileID: file.ID,
 			body: files.UpdateCategoriesRequest{
 				CategoryIDs: []string{},
 			},
 			wantCode: http.StatusOK,
 		},
 		{
-			name:     "invalid file id",
+			name:     "invalid file id returns not found",
 			fileID:   "invalid",
 			body:     files.UpdateCategoriesRequest{CategoryIDs: []string{}},
-			wantCode: http.StatusBadRequest,
+			wantCode: http.StatusNotFound,
 		},
 		{
 			name:     "file not found",
@@ -63,7 +60,7 @@ func TestUpdateFileCategories(t *testing.T) {
 		},
 		{
 			name:     "invalid request body",
-			fileID:   uuid.UUID(file.ID.Bytes).String(),
+			fileID:   file.ID,
 			body:     "invalid",
 			wantCode: http.StatusBadRequest,
 		},

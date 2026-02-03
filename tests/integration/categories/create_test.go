@@ -8,7 +8,6 @@ import (
 	"stl-manager/tests/integration/helpers"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,8 +44,7 @@ func TestCreateCategory(t *testing.T) {
 			// Cleanup if created
 			if resp.Code == http.StatusCreated {
 				if id := resp.GetString("id"); id != "" {
-					categoryID, _ := uuid.Parse(id)
-					helpers.DeleteTestCategory(t, pgtype.UUID{Bytes: categoryID, Valid: true})
+					helpers.DeleteTestCategory(t, id)
 				}
 			}
 		})

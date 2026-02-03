@@ -19,7 +19,7 @@ func TestMain(m *testing.M) {
 
 	cfg := &config.Config{OpenAIAPIKey: ""}
 	classifier := ai.NewOpenAIClassifier("")
-	handler = files.New(helpers.TestPool, classifier, cfg, helpers.TestLogger)
+	handler = files.New(helpers.TestDB, classifier, cfg, helpers.TestLogger)
 
 	code := m.Run()
 	helpers.CleanupTestDatabase()

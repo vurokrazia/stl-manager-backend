@@ -207,3 +207,76 @@ func (r *HTTPTestResponse) GetMap(key string) map[string]interface{} {
 	}
 	return nil
 }
+
+// HTTPTestArrayResponse represents a test HTTP response with array body
+type HTTPTestArrayResponse struct {
+	*httptest.ResponseRecorder
+	Body []map[string]interface{}
+}
+
+// MakeRequestArray creates and executes an HTTP test request expecting an array response
+func MakeRequestArray(t *testing.T, req HTTPTestRequest, handler http.HandlerFunc) *HTTPTestArrayResponse {
+	// Prepare request body
+	var bodyReader io.Reader
+	if req.Body != nil {
+		if str, ok := req.Body.(string); ok {
+			bodyReader = bytes.NewBufferString(str)
+		} else {
+			bodyBytes, err := json.Marshal(req.Body)
+			require.NoError(t, err, "Failed to marshal request body")
+			bodyReader = bytes.NewBuffer(bodyBytes)
+		}
+	}
+
+	// Create HTTP request
+	httpReq := httptest.NewRequest(req.Method, req.URL, bodyReader)
+
+	// Add headers
+	if req.Headers != nil {
+		for key, value := range req.Headers {
+			httpReq.Header.Set(key, value)
+		}
+	}
+
+	// Add default Content-Type if not set and body exists
+	if req.Body != nil && httpReq.Header.Get("Content-Type") == "" {
+		httpReq.Header.Set("Content-Type", "application/json")
+	}
+
+	// Add URL params (for chi router)
+	if req.URLParams != nil {
+		rctx := chi.NewRouteContext()
+		for key, value := range req.URLParams {
+			rctx.URLParams.Add(key, value)
+		}
+		httpReq = httpReq.WithContext(context.WithValue(httpReq.Context(), chi.RouteCtxKey, rctx))
+	}
+
+	// Add query params
+	if req.QueryParams != nil {
+		q := httpReq.URL.Query()
+		for key, value := range req.QueryParams {
+			q.Add(key, value)
+		}
+		httpReq.URL.RawQuery = q.Encode()
+	}
+
+	// Execute request
+	recorder := httptest.NewRecorder()
+	handler(recorder, httpReq)
+
+	// Parse response body as array
+	response := &HTTPTestArrayResponse{
+		ResponseRecorder: recorder,
+		Body:             []map[string]interface{}{},
+	}
+
+	if recorder.Body.Len() > 0 {
+		err := json.NewDecoder(recorder.Body).Decode(&response.Body)
+		if err != nil {
+			t.Logf("Warning: failed to decode response body as array: %v", err)
+		}
+	}
+
+	return response
+}

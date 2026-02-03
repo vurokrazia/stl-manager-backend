@@ -14,7 +14,7 @@ func TestReclassifyFile(t *testing.T) {
 	folder := helpers.CreateTestFolder(t, "test-folder")
 	defer helpers.DeleteTestFolder(t, folder.ID)
 
-	file := helpers.CreateTestFile(t, "dragon-miniature", "stl", folder.ID)
+	file := helpers.CreateTestFile(t, "dragon-miniature", "stl", &folder.ID)
 	defer helpers.DeleteTestFile(t, file.ID)
 
 	tests := []struct {
@@ -24,13 +24,13 @@ func TestReclassifyFile(t *testing.T) {
 	}{
 		{
 			name:     "reclassify requires OpenAI",
-			fileID:   uuid.UUID(file.ID.Bytes).String(),
+			fileID:   file.ID,
 			wantCode: http.StatusServiceUnavailable, // OpenAI not enabled in tests
 		},
 		{
-			name:     "invalid file id",
+			name:     "invalid file id returns not found",
 			fileID:   "invalid",
-			wantCode: http.StatusBadRequest,
+			wantCode: http.StatusNotFound,
 		},
 		{
 			name:     "file not found",

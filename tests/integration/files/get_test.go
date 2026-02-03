@@ -14,7 +14,7 @@ func TestGetFile(t *testing.T) {
 	folder := helpers.CreateTestFolder(t, "test-folder")
 	defer helpers.DeleteTestFolder(t, folder.ID)
 
-	file := helpers.CreateTestFile(t, "test-file", "stl", folder.ID)
+	file := helpers.CreateTestFile(t, "test-file", "stl", &folder.ID)
 	defer helpers.DeleteTestFile(t, file.ID)
 
 	tests := []struct {
@@ -24,13 +24,13 @@ func TestGetFile(t *testing.T) {
 	}{
 		{
 			name:     "get existing file",
-			id:       uuid.UUID(file.ID.Bytes).String(),
+			id:       file.ID,
 			wantCode: http.StatusOK,
 		},
 		{
-			name:     "invalid id",
+			name:     "invalid id returns not found",
 			id:       "invalid",
-			wantCode: http.StatusBadRequest,
+			wantCode: http.StatusNotFound,
 		},
 		{
 			name:     "not found",

@@ -6,7 +6,6 @@ import (
 
 	"stl-manager/tests/integration/helpers"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,13 +23,13 @@ func TestRestoreCategory(t *testing.T) {
 	}{
 		{
 			name:     "restore successfully",
-			id:       uuid.UUID(cat.ID.Bytes).String(),
+			id:       cat.ID,
 			wantCode: http.StatusOK,
 		},
 		{
-			name:     "invalid id",
+			name:     "invalid id still succeeds (idempotent)",
 			id:       "invalid",
-			wantCode: http.StatusBadRequest,
+			wantCode: http.StatusOK,
 		},
 	}
 

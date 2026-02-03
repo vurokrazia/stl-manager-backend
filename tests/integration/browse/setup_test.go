@@ -15,7 +15,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
-	handler = browse.New(helpers.TestPool, helpers.TestLogger)
+	handler = browse.New(helpers.TestDB, helpers.TestLogger)
 
 	code := m.Run()
 	helpers.CleanupTestDatabase()

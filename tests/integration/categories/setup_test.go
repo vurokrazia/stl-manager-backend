@@ -17,7 +17,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Create handler
-	handler = categories.New(helpers.TestPool, helpers.TestLogger)
+	handler = categories.New(helpers.TestDB, helpers.TestLogger)
 
 	// Run tests
 	code := m.Run()

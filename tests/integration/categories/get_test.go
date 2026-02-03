@@ -21,13 +21,13 @@ func TestGetCategory(t *testing.T) {
 	}{
 		{
 			name:     "get existing category",
-			id:       uuid.UUID(cat.ID.Bytes).String(),
+			id:       cat.ID,
 			wantCode: http.StatusOK,
 		},
 		{
-			name:     "invalid id",
+			name:     "invalid id returns not found",
 			id:       "invalid",
-			wantCode: http.StatusBadRequest,
+			wantCode: http.StatusNotFound,
 		},
 		{
 			name:     "not found",

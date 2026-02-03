@@ -6,19 +6,17 @@ import (
 	"testing"
 	"time"
 
-	"stl-manager/internal/db"
+	"stl-manager/internal/database"
+	"stl-manager/internal/db/sqlite"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
 var (
-	// TestPool is the shared database connection pool for all tests
-	TestPool *pgxpool.Pool
+	// TestDB is the shared database connection for all tests
+	TestDB database.Database
 	// TestLogger is the shared logger for all tests
 	TestLogger *zap.Logger
 )
@@ -26,9 +24,6 @@ var (
 // SetupTestDatabase initializes the database connection for tests
 // Call this from TestMain in your test packages
 func SetupTestDatabase() error {
-	// Load .env for test database connection
-	_ = godotenv.Load("../../../.env")
-
 	// Setup logger
 	var err error
 	TestLogger, err = zap.NewDevelopment()
@@ -36,16 +31,16 @@ func SetupTestDatabase() error {
 		return err
 	}
 
-	// Connect to database
-	ctx := context.Background()
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		TestLogger.Fatal("DATABASE_URL not set")
+	// Use in-memory SQLite database for tests
+	dbPath := os.Getenv("TEST_DB_PATH")
+	if dbPath == "" {
+		dbPath = ":memory:"
 	}
 
-	TestPool, err = pgxpool.New(ctx, dbURL)
+	TestDB, err = sqlite.Open(dbPath)
 	if err != nil {
-		TestLogger.Fatal("failed to connect to database", zap.Error(err))
+		TestLogger.Fatal("failed to open test database", zap.Error(err))
+		return err
 	}
 
 	return nil
@@ -53,191 +48,151 @@ func SetupTestDatabase() error {
 
 // CleanupTestDatabase closes the database connection
 func CleanupTestDatabase() {
-	if TestPool != nil {
-		TestPool.Close()
+	if TestDB != nil {
+		TestDB.Close()
 	}
 }
 
 // Category Helpers
 
 // CreateTestCategory creates a test category with a unique name
-func CreateTestCategory(t *testing.T, name string) *db.Category {
+func CreateTestCategory(t *testing.T, name string) *database.Category {
 	ctx := context.Background()
-	queries := db.New(TestPool)
 
 	// Add UUID to ensure uniqueness
 	uniqueName := name + "-" + uuid.New().String()[:8]
+	id := uuid.New().String()
 
-	category, err := queries.CreateCategory(ctx, uniqueName)
+	category, err := TestDB.CreateCategory(ctx, id, uniqueName)
 	require.NoError(t, err, "Failed to create test category")
 
-	return &category
+	return category
 }
 
 // DeleteTestCategory hard deletes a test category (cleanup)
-func DeleteTestCategory(t *testing.T, id pgtype.UUID) {
+func DeleteTestCategory(t *testing.T, id string) {
 	ctx := context.Background()
-	queries := db.New(TestPool)
 
-	err := queries.DeleteCategory(ctx, id)
+	err := TestDB.SoftDeleteCategory(ctx, id)
 	if err != nil {
 		t.Logf("Warning: failed to delete test category: %v", err)
 	}
 }
 
 // SoftDeleteTestCategory soft deletes a test category
-func SoftDeleteTestCategory(t *testing.T, id pgtype.UUID) {
+func SoftDeleteTestCategory(t *testing.T, id string) {
 	ctx := context.Background()
-	queries := db.New(TestPool)
 
-	err := queries.SoftDeleteCategory(ctx, id)
+	err := TestDB.SoftDeleteCategory(ctx, id)
 	require.NoError(t, err, "Failed to soft delete test category")
 }
 
 // RestoreTestCategory restores a soft deleted category
-func RestoreTestCategory(t *testing.T, id pgtype.UUID) {
+func RestoreTestCategory(t *testing.T, id string) {
 	ctx := context.Background()
-	queries := db.New(TestPool)
 
-	err := queries.RestoreCategory(ctx, id)
+	err := TestDB.RestoreCategory(ctx, id)
 	require.NoError(t, err, "Failed to restore test category")
 }
 
 // GetTestCategory retrieves a category by ID
-func GetTestCategory(t *testing.T, id pgtype.UUID) *db.Category {
+func GetTestCategory(t *testing.T, id string) *database.Category {
 	ctx := context.Background()
-	queries := db.New(TestPool)
 
-	category, err := queries.GetCategory(ctx, id)
+	category, err := TestDB.GetCategory(ctx, id)
 	require.NoError(t, err, "Failed to get test category")
 
-	return &category
+	return category
 }
 
 // File Helpers
 
 // CreateTestFile creates a test file
-func CreateTestFile(t *testing.T, fileName, fileType string, folderID pgtype.UUID) *db.File {
+func CreateTestFile(t *testing.T, fileName, fileType string, folderID *string) *database.File {
 	ctx := context.Background()
-	queries := db.New(TestPool)
 
 	// Generate unique path
+	id := uuid.New().String()
 	uniquePath := "/test/path/" + fileName + "-" + uuid.New().String()[:8] + "." + fileType
 
-	// Create file
-	file, err := queries.CreateFile(ctx, db.CreateFileParams{
-		Path:       uniquePath,
-		FileName:   fileName + "." + fileType,
-		Type:       fileType,
-		Size:       1024,
-		ModifiedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-	})
+	file, err := TestDB.UpsertFile(ctx, id, uniquePath, fileName+"."+fileType, fileType, 1024, time.Now(), nil, folderID)
 	require.NoError(t, err, "Failed to create test file")
 
-	// Update folder_id if provided
-	if folderID.Valid {
-		err = queries.UpdateFileFolderID(ctx, db.UpdateFileFolderIDParams{
-			ID:       file.ID,
-			FolderID: folderID,
-		})
-		require.NoError(t, err, "Failed to set file folder")
-
-		// Refresh file to get updated folder_id
-		file, err = queries.GetFile(ctx, file.ID)
-		require.NoError(t, err, "Failed to get updated file")
-	}
-
-	return &file
-}
-
-// DeleteTestFile hard deletes a test file (cleanup)
-func DeleteTestFile(t *testing.T, id pgtype.UUID) {
-	ctx := context.Background()
-	queries := db.New(TestPool)
-
-	err := queries.DeleteFile(ctx, id)
-	if err != nil {
-		t.Logf("Warning: failed to delete test file: %v", err)
-	}
+	return file
 }
 
 // GetTestFile retrieves a file by ID
-func GetTestFile(t *testing.T, id pgtype.UUID) *db.File {
+func GetTestFile(t *testing.T, id string) *database.File {
 	ctx := context.Background()
-	queries := db.New(TestPool)
 
-	file, err := queries.GetFile(ctx, id)
+	file, err := TestDB.GetFile(ctx, id)
 	require.NoError(t, err, "Failed to get test file")
 
-	return &file
+	return file
+}
+
+// DeleteTestFile is a no-op for in-memory database
+func DeleteTestFile(t *testing.T, id string) {
+	// In-memory database cleans up automatically
 }
 
 // Folder Helpers
 
 // CreateTestFolder creates a test folder
-func CreateTestFolder(t *testing.T, name string) *db.Folder {
+func CreateTestFolder(t *testing.T, name string) *database.Folder {
 	ctx := context.Background()
-	queries := db.New(TestPool)
 
 	// Generate unique path
+	id := uuid.New().String()
 	uniquePath := "/test/folders/" + name + "-" + uuid.New().String()[:8]
 
-	folder, err := queries.CreateFolder(ctx, db.CreateFolderParams{
-		Name: name,
-		Path: uniquePath,
-	})
+	folder, err := TestDB.CreateFolder(ctx, id, name, uniquePath)
 	require.NoError(t, err, "Failed to create test folder")
 
-	return &folder
-}
-
-// DeleteTestFolder hard deletes a test folder (cleanup)
-func DeleteTestFolder(t *testing.T, id pgtype.UUID) {
-	ctx := context.Background()
-	queries := db.New(TestPool)
-
-	err := queries.DeleteFolder(ctx, id)
-	if err != nil {
-		t.Logf("Warning: failed to delete test folder: %v", err)
-	}
+	return folder
 }
 
 // GetTestFolder retrieves a folder by ID
-func GetTestFolder(t *testing.T, id pgtype.UUID) *db.Folder {
+func GetTestFolder(t *testing.T, id string) *database.Folder {
 	ctx := context.Background()
-	queries := db.New(TestPool)
 
-	folder, err := queries.GetFolder(ctx, id)
+	folder, err := TestDB.GetFolder(ctx, id)
 	require.NoError(t, err, "Failed to get test folder")
 
-	return &folder
+	return folder
+}
+
+// DeleteTestFolder is a no-op for in-memory database
+func DeleteTestFolder(t *testing.T, id string) {
+	// In-memory database cleans up automatically
 }
 
 // Scan Helpers
 
 // CreateTestScan creates a test scan
-func CreateTestScan(t *testing.T, status string) *db.Scan {
+func CreateTestScan(t *testing.T, status string) *database.Scan {
 	ctx := context.Background()
-	queries := db.New(TestPool)
 
-	scan, err := queries.CreateScan(ctx, db.CreateScanParams{
-		Status:    status,
-		Found:     pgtype.Int4{Int32: 0, Valid: true},
-		Processed: pgtype.Int4{Int32: 0, Valid: true},
-		Progress:  pgtype.Int4{Int32: 0, Valid: true},
-	})
+	id := uuid.New().String()
+	scan, err := TestDB.CreateScan(ctx, id, status, 0, 0, 0)
 	require.NoError(t, err, "Failed to create test scan")
 
-	return &scan
+	return scan
 }
 
-// DeleteTestScan hard deletes a test scan (cleanup)
-func DeleteTestScan(t *testing.T, id pgtype.UUID) {
-	ctx := context.Background()
-	queries := db.New(TestPool)
+// DeleteTestScan is a no-op for now (SQLite doesn't have DeleteScan in the interface)
+func DeleteTestScan(t *testing.T, id string) {
+	// SQLite implementation doesn't expose DeleteScan through the interface
+	// Tests using in-memory database don't need explicit cleanup
+}
 
-	err := queries.DeleteScan(ctx, id)
-	if err != nil {
-		t.Logf("Warning: failed to delete test scan: %v", err)
-	}
+// CreateTestScanPath creates a test scan path
+func CreateTestScanPath(t *testing.T, scanID, rootPath string) *database.ScanPath {
+	ctx := context.Background()
+
+	id := uuid.New().String()
+	scanPath, err := TestDB.CreateScanPath(ctx, id, scanID, rootPath)
+	require.NoError(t, err, "Failed to create test scan path")
+
+	return scanPath
 }
